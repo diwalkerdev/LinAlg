@@ -156,6 +156,7 @@ using Matrixd = Matrix<double, Rows, Cols>;
 
 //////////////////////////////////////////////////////////////////////////////
 #include <algorithm>
+#include <numeric>
 #include <vector>
 
 
@@ -163,10 +164,7 @@ template <typename M>
 auto row_idxs(M& mat) -> std::vector<int>
 {
     std::vector<int> v(M::NumRows);
-
-    int i = -1;
-    std::generate(v.begin(), v.end(), [&i]() -> int { return ++i; });
-
+    std::iota(v.begin(), v.end(), 0);
     return v;
 }
 
