@@ -52,9 +52,9 @@ struct Matrix {
     //     return m;
     // }
 
-    std::span<Scalar> operator[](size_t index)
+    std::span<Scalar, Cols> operator[](size_t index)
     {
-        return {&data[index * Cols], Cols};
+        return std::span<Scalar, Cols> {&data[index * Cols], Cols};
     }
 
     // Matrix<Scalar, Rows, Cols>& operator=(Matrix<Scalar, Rows, Cols> other)
@@ -131,7 +131,7 @@ auto operator*(MLeft A, Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRow
 
 
 template <typename MLeft, typename Scalar>
-auto operator*=(MLeft A, Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
+auto operator*=(MLeft& A, Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
 {
     for (auto& el : A.data)
     {
@@ -161,9 +161,9 @@ using Matrixd = Matrix<double, Rows, Cols>;
 
 
 template <typename M>
-auto row_idxs(M& mat) -> std::vector<int>
+auto row_idxs(M& mat) -> std::array<int, M::NumRows>
 {
-    std::vector<int> v(M::NumRows);
+    std::array<int, M::NumRows> v;
     std::iota(v.begin(), v.end(), 0);
     return v;
 }
