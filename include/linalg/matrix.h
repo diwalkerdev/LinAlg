@@ -1,11 +1,13 @@
 #ifndef LINALG_MATRIX_H
 #define LINALG_MATRIX_H
 
+#include <algorithm>
 #include <array>
 #include <iostream>
-#include <memory>
+#include <numeric>
 #include <span>
 #include <stddef.h>
+#include <vector>
 
 namespace linalg {
 
@@ -155,9 +157,6 @@ using Matrixd = Matrix<double, Rows, Cols>;
 } // end namespace linalg
 
 //////////////////////////////////////////////////////////////////////////////
-#include <algorithm>
-#include <numeric>
-#include <vector>
 
 
 template <typename M>
