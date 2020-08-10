@@ -1,7 +1,7 @@
 #ifndef LINALG_UTIL_H
 #define LINALG_UTIL_H
 
-#include "linalg/matrix.h"
+#include "linalg/matrix.hpp"
 #include <cmath>
 
 //////////////////////////////////////////////////////////////////////////////
