@@ -1,8 +1,10 @@
 #ifndef LINALG_MATRIX_H
 #define LINALG_MATRIX_H
 
+#include "misc.hpp"
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <iostream>
 #include <numeric>
 #include <span>
@@ -144,6 +146,27 @@ auto operator*=(MLeft& A, Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumR
 }
 
 //////////////////////////////////////////////////////////////////////////////
+
+template <typename MAT, size_t N>
+auto cols(MAT& mat, int const (&values)[N]) -> linalg::Matrix<typename MAT::Scalar, MAT::NumRows, N>
+{
+    linalg::Matrix<typename MAT::Scalar, MAT::NumRows, N> other;
+
+    int dst = 0;
+    for (auto src : values)
+    {
+        assert(src < MAT::NumCols);
+
+        for (int r : irange<MAT::NumRows>())
+        {
+            other[r][dst] = mat[r][src];
+        }
+        ++dst;
+    }
+
+    return other;
+}
+
 template <size_t Rows, size_t Cols>
 using Matrixi = Matrix<int, Rows, Cols>;
 
@@ -153,32 +176,20 @@ using Matrixf = Matrix<float, Rows, Cols>;
 template <size_t Rows, size_t Cols>
 using Matrixd = Matrix<double, Rows, Cols>;
 
-
 } // end namespace linalg
 
 //////////////////////////////////////////////////////////////////////////////
-
-
-template <typename M>
-auto row_idxs(M& mat) -> std::array<int, M::NumRows>
-{
-    std::array<int, M::NumRows> v;
-    std::iota(v.begin(), v.end(), 0);
-    return v;
-}
-
 
 template <typename M>
 auto iter(M& mat) -> std::vector<typename M::RowType>
 {
     std::vector<typename M::RowType> v;
-    for (auto i : row_idxs(mat))
+    for (auto i : irange<M::NumRows>())
     {
         v.push_back(mat[i]);
     }
     return v;
 }
-
 
 //////////////////////////////////////////////////////////////////////////////
 

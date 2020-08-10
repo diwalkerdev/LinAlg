@@ -4,48 +4,56 @@
 #include "linalg/matrix.h"
 #include <cmath>
 
+//////////////////////////////////////////////////////////////////////////////
 
-linalg::Matrix<float, 2, 2> lrotzf(float alpha)
+auto lrotzf(float alpha) -> linalg::Matrix<float, 2, 2>
 {
     // clang-format off
     return {{
-        cosf(alpha), sinf(alpha), 
+        cosf(alpha), sinf(alpha),
         -sinf(alpha), cosf(alpha)
     }};
     // clang-format on
 }
 
+//////////////////////////////////////////////////////////////////////////////
 
-linalg::Matrix<float, 2, 2> rrotzf(float alpha)
+auto rrotzf(float alpha) -> linalg::Matrix<float, 2, 2>
 {
     // clang-format off
     return {{
-        cosf(alpha), -sinf(alpha), 
+        cosf(alpha), -sinf(alpha),
         sinf(alpha), cosf(alpha)
     }};
     // clang-format on
 }
 
+//////////////////////////////////////////////////////////////////////////////
 
-linalg::Matrix<float, 2, 3> ltransf(float alpha, float x, float y)
+auto ltransf(float alpha, float x, float y) -> linalg::Matrix<float, 3, 3>
 {
     // clang-format off
     return {{
-        cosf(alpha), sinf(alpha), x,
-        -sinf(alpha), cosf(alpha) , y,
+         cosf(alpha), sinf(alpha), x,
+        -sinf(alpha), cosf(alpha), y,
+         0,                     0, 1
     }};
     // clang-format on
 }
 
-linalg::Matrix<float, 3, 2> rtransf(float alpha, float x, float y)
+//////////////////////////////////////////////////////////////////////////////
+
+auto rtransf(float alpha, float x, float y) -> linalg::Matrix<float, 3, 3>
 {
     // clang-format off
     return {{
-        cosf(alpha), -sinf(alpha),
-        sinf(alpha),  cosf(alpha) ,
-        x,            y
+        cosf(alpha), -sinf(alpha), 0,
+        sinf(alpha),  cosf(alpha), 0,
+        x,            y          , 1
     }};
     // clang-format on
 }
+
+//////////////////////////////////////////////////////////////////////////////
 
 #endif // LINALG_UTIL_H
