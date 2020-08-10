@@ -2,14 +2,15 @@
 #define LINALG_MATRIX_H
 
 #include "misc.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <iostream>
 #include <numeric>
 #include <span>
-#include <stddef.h>
-#include <vector>
+
+//////////////////////////////////////////////////////////////////////////////
 
 namespace linalg {
 
@@ -181,12 +182,12 @@ using Matrixd = Matrix<double, Rows, Cols>;
 //////////////////////////////////////////////////////////////////////////////
 
 template <typename M>
-auto iter(M& mat) -> std::vector<typename M::RowType>
+auto iter(M& mat) -> std::array<typename M::RowType, M::NumRows>
 {
-    std::vector<typename M::RowType> v;
+    std::array<typename M::RowType, M::NumRows> v;
     for (auto i : irange<M::NumRows>())
     {
-        v.push_back(mat[i]);
+        v[i] = mat[i];
     }
     return v;
 }
@@ -209,5 +210,6 @@ std::ostream& operator<<(std::ostream&                       os,
     return os;
 }
 
+//////////////////////////////////////////////////////////////////////////////
 
 #endif // LINALG_MATRIX_H
