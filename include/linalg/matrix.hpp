@@ -22,17 +22,25 @@ struct Matrix {
 
     using Scalar  = ScalarType;
     using RowType = std::span<Scalar>;
-    using array2d = std::array<Scalar, Cols * Rows>;
-    array2d data;
-    // std::shared_ptr<array2d> data = std::make_shared<array2d>();
+    std::array<Scalar, Cols * Rows> data;
 
     Matrix()                                        = default;
     Matrix(Matrix<Scalar, Rows, Cols> const& other) = default;
     Matrix(Matrix<Scalar, Rows, Cols>&& other)      = default;
+    Matrix<Scalar, Rows, Cols>& operator=(Matrix<Scalar, Rows, Cols> const& other) = default;
+    Matrix<Scalar, Rows, Cols>& operator=(Matrix<Scalar, Rows, Cols>&& other) = default;
 
-    Matrix(array2d initializer)
-        : data(initializer)
+    Matrix(ScalarType const (&initializer)[1])
     {
+        std::fill(data.begin(), data.end(), initializer[0]);
+    }
+
+    template <size_t M, size_t N>
+    Matrix(ScalarType const (&initializer)[M][N])
+    {
+        static_assert(M == NumRows);
+        static_assert(N == NumCols);
+        std::copy_n(&initializer[0][0], M * N, data.begin());
     }
 
     // static
@@ -121,8 +129,8 @@ auto operator*(MLeft A, MRight B) -> Matrix<decltype(A[0][0] * B[0][0]), MLeft::
 }
 
 
-template <typename MLeft, typename Scalar>
-auto operator*(MLeft A, Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
+template <typename MLeft>
+auto operator*(MLeft A, float B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
 {
     Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols> result(A);
 
@@ -134,6 +142,11 @@ auto operator*(MLeft A, Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRow
     return result;
 }
 
+template <typename MLeft>
+auto operator*(float B, MLeft A) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
+{
+    return A * B;
+}
 
 template <typename MLeft, typename Scalar>
 auto operator*=(MLeft& A, Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
@@ -145,6 +158,51 @@ auto operator*=(MLeft& A, Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumR
 
     return A;
 }
+
+
+template <typename MLeft, typename MRight>
+auto operator+(MLeft A, MRight B) -> Matrix<decltype(A[0][0] + B[0][0]), MLeft::NumRows, MRight::NumCols>
+{
+    static_assert(MLeft::NumCols == MRight::NumCols,
+                  "Invalid matrix dimensions.");
+    static_assert(MLeft::NumRows == MRight::NumRows,
+                  "Invalid matrix dimensions.");
+
+    Matrix<decltype(A[0][0] + B[0][0]), MLeft::NumRows, MRight::NumCols> result;
+
+    size_t i, j;
+
+    for (i = 0; i < MLeft::NumRows; ++i)
+    {
+        for (j = 0; j < MRight::NumCols; ++j)
+        {
+            result[i][j] = A[i][j] + B[i][j];
+        }
+    }
+
+    return result;
+}
+
+
+template <typename MLeft>
+auto operator+(MLeft A, float B) -> Matrix<decltype(A[0][0] + B), MLeft::NumRows, MLeft::NumCols>
+{
+    Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols> result(A);
+
+    for (auto& el : result.data)
+    {
+        el += B;
+    }
+
+    return result;
+}
+
+template <typename MLeft>
+auto operator+(float B, MLeft A) -> Matrix<decltype(A[0][0] + B), MLeft::NumRows, MLeft::NumCols>
+{
+    return A + B;
+}
+
 
 //////////////////////////////////////////////////////////////////////////////
 

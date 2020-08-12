@@ -9,50 +9,35 @@
 
 auto lrotzf(float alpha) -> linalg::Matrix<float, 2, 2>
 {
-    // clang-format off
-    return {{
-        cosf(alpha), sinf(alpha),
-        -sinf(alpha), cosf(alpha)
-    }};
-    // clang-format on
+    return {{{cosf(alpha), sinf(alpha)},
+             {-sinf(alpha), cosf(alpha)}}};
 }
 
 //////////////////////////////////////////////////////////////////////////////
 
 auto rrotzf(float alpha) -> linalg::Matrix<float, 2, 2>
 {
-    // clang-format off
-    return {{
-        cosf(alpha), -sinf(alpha),
-        sinf(alpha), cosf(alpha)
-    }};
-    // clang-format on
+
+    return {{{cosf(alpha), -sinf(alpha)},
+             {sinf(alpha), cosf(alpha)}}};
 }
 
 //////////////////////////////////////////////////////////////////////////////
 
 auto ltransf(float alpha, float x, float y) -> linalg::Matrix<float, 3, 3>
 {
-    // clang-format off
-    return {{
-         cosf(alpha), sinf(alpha), x,
-        -sinf(alpha), cosf(alpha), y,
-         0,                     0, 1
-    }};
-    // clang-format on
+    return {{{cosf(alpha), sinf(alpha), x},
+             {-sinf(alpha), cosf(alpha), y},
+             {0, 0, 1}}};
 }
 
 //////////////////////////////////////////////////////////////////////////////
 
 auto rtransf(float alpha, float x, float y) -> linalg::Matrix<float, 3, 3>
 {
-    // clang-format off
-    return {{
-        cosf(alpha), -sinf(alpha), 0,
-        sinf(alpha),  cosf(alpha), 0,
-        x,            y          , 1
-    }};
-    // clang-format on
+    return {{{cosf(alpha), -sinf(alpha), 0},
+             {sinf(alpha), cosf(alpha), 0},
+             {x, y, 1}}};
 }
 
 //////////////////////////////////////////////////////////////////////////////
