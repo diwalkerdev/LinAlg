@@ -14,7 +14,7 @@
 
 namespace linalg {
 
-template <typename ScalarType, size_t Rows, size_t Cols>
+template <std::floating_point ScalarType, size_t Rows, size_t Cols>
 struct Matrix {
     static const size_t NumCols = Cols;
     static const size_t NumRows = Rows;
@@ -130,9 +130,10 @@ auto operator*(MLeft A, MRight B) -> Matrix<decltype(A[0][0] * B[0][0]), MLeft::
 
 
 template <typename MLeft>
-auto operator*(MLeft A, float B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
+auto operator*(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
 {
-    Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols> result(A);
+    Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
+        result(A);
 
     for (auto& el : result.data)
     {
@@ -142,14 +143,16 @@ auto operator*(MLeft A, float B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows
     return result;
 }
 
-template <typename MLeft>
-auto operator*(float B, MLeft A) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
+
+template <typename MRight>
+auto operator*(typename MRight::Scalar B, MRight A) -> Matrix<decltype(A[0][0] * B), MRight::NumRows, MRight::NumCols>
 {
     return A * B;
 }
 
-template <typename MLeft, typename Scalar>
-auto operator*=(MLeft& A, Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
+
+template <typename MLeft>
+auto operator*=(MLeft& A, typename MLeft::Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
 {
     for (auto& el : A.data)
     {
@@ -185,7 +188,7 @@ auto operator+(MLeft A, MRight B) -> Matrix<decltype(A[0][0] + B[0][0]), MLeft::
 
 
 template <typename MLeft>
-auto operator+(MLeft A, float B) -> Matrix<decltype(A[0][0] + B), MLeft::NumRows, MLeft::NumCols>
+auto operator+(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(A[0][0] + B), MLeft::NumRows, MLeft::NumCols>
 {
     Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols> result(A);
 
@@ -197,12 +200,12 @@ auto operator+(MLeft A, float B) -> Matrix<decltype(A[0][0] + B), MLeft::NumRows
     return result;
 }
 
-template <typename MLeft>
-auto operator+(float B, MLeft A) -> Matrix<decltype(A[0][0] + B), MLeft::NumRows, MLeft::NumCols>
+
+template <typename MRight>
+auto operator+(typename MRight::Scalar B, MRight A) -> Matrix<decltype(A[0][0] + B), MRight::NumRows, MRight::NumCols>
 {
     return A + B;
 }
-
 
 //////////////////////////////////////////////////////////////////////////////
 
