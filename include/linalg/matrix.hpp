@@ -65,11 +65,18 @@ struct Matrix {
     //     return m;
     // }
 
-    std::span<Scalar, Cols> operator[](size_t index)
+    auto operator[](size_t index)
     {
         assert(index < Rows);
         assert(index >= 0);
-        return std::span<Scalar, Cols> {&data[index * Cols], Cols};
+        if constexpr (Cols > 1)
+        {
+            return std::span<Scalar, Cols> {&data[index * Cols], Cols};
+        }
+        else
+        {
+            return data[index];
+        }
     }
 
     // Matrix<Scalar, Rows, Cols>& operator=(Matrix<Scalar, Rows, Cols> other)
@@ -106,13 +113,28 @@ struct Matrix {
 
 //////////////////////////////////////////////////////////////////////////////
 
+// _idx avoids the use of the [] operator. This is expected to be useful when
+// vectors are added as it allows vectors and matrices to use the same code,
+// i.e. vectors are matrices where one of the dimensions is 1.
+template <typename M>
+inline auto _idx(M& mat, size_t r, size_t c) -> float*
+{
+    return &mat.data[0] + ((r * M::NumCols) + c);
+}
+
+template <typename M>
+inline auto _idxv(M const& mat, size_t r, size_t c) -> float
+{
+    return *(&mat.data[0] + ((r * M::NumCols) + c));
+}
+
 template <typename MLeft, typename MRight>
-auto operator*(MLeft A, MRight B) -> Matrix<decltype(A[0][0] * B[0][0]), MLeft::NumRows, MRight::NumCols>
+auto operator*(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) * _idxv(B, 0, 0)), MLeft::NumRows, MRight::NumCols>
 {
     static_assert(MLeft::NumCols == MRight::NumRows,
                   "Invalid matrix dimensions.");
 
-    Matrix<decltype(A[0][0] * B[0][0]), MLeft::NumRows, MRight::NumCols> result {{0}};
+    Matrix<decltype(_idxv(A, 0, 0) * _idxv(B, 0, 0)), MLeft::NumRows, MRight::NumCols> result {{0}};
 
     size_t i, j, k;
 
@@ -122,7 +144,7 @@ auto operator*(MLeft A, MRight B) -> Matrix<decltype(A[0][0] * B[0][0]), MLeft::
         {
             for (k = 0; k < MLeft::NumCols; ++k)
             {
-                result[i][j] += A[i][k] * B[k][j];
+                *_idx(result, i, j) += _idxv(A, i, k) * _idxv(B, k, j);
             }
         }
     }
@@ -132,9 +154,9 @@ auto operator*(MLeft A, MRight B) -> Matrix<decltype(A[0][0] * B[0][0]), MLeft::
 
 
 template <typename MLeft>
-auto operator*(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
+auto operator*(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::NumRows, MLeft::NumCols>
 {
-    Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
+    Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::NumRows, MLeft::NumCols>
         result(A);
 
     for (auto& el : result.data)
@@ -147,14 +169,14 @@ auto operator*(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(A[0][0] * B
 
 
 template <typename MRight>
-auto operator*(typename MRight::Scalar B, MRight A) -> Matrix<decltype(A[0][0] * B), MRight::NumRows, MRight::NumCols>
+auto operator*(typename MRight::Scalar B, MRight A) -> Matrix<decltype(_idxv(A, 0, 0) * B), MRight::NumRows, MRight::NumCols>
 {
     return A * B;
 }
 
 
 template <typename MLeft>
-auto operator*=(MLeft& A, typename MLeft::Scalar B) -> Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols>
+auto operator*=(MLeft& A, typename MLeft::Scalar B) -> Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::NumRows, MLeft::NumCols>
 {
     for (auto& el : A.data)
     {
@@ -166,14 +188,14 @@ auto operator*=(MLeft& A, typename MLeft::Scalar B) -> Matrix<decltype(A[0][0] *
 
 
 template <typename MLeft, typename MRight>
-auto operator+(MLeft A, MRight B) -> Matrix<decltype(A[0][0] + B[0][0]), MLeft::NumRows, MRight::NumCols>
+auto operator+(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) + _idxv(B, 0, 0)), MLeft::NumRows, MRight::NumCols>
 {
     static_assert(MLeft::NumCols == MRight::NumCols,
                   "Invalid matrix dimensions.");
     static_assert(MLeft::NumRows == MRight::NumRows,
                   "Invalid matrix dimensions.");
 
-    Matrix<decltype(A[0][0] + B[0][0]), MLeft::NumRows, MRight::NumCols> result;
+    Matrix<decltype(_idxv(A, 0, 0) + _idxv(B, 0, 0)), MLeft::NumRows, MRight::NumCols> result;
 
     size_t i, j;
 
@@ -181,7 +203,7 @@ auto operator+(MLeft A, MRight B) -> Matrix<decltype(A[0][0] + B[0][0]), MLeft::
     {
         for (j = 0; j < MRight::NumCols; ++j)
         {
-            result[i][j] = A[i][j] + B[i][j];
+            *_idx(result, i, j) = _idxv(A, i, j) + _idxv(B, i, j);
         }
     }
 
@@ -190,9 +212,9 @@ auto operator+(MLeft A, MRight B) -> Matrix<decltype(A[0][0] + B[0][0]), MLeft::
 
 
 template <typename MLeft>
-auto operator+(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(A[0][0] + B), MLeft::NumRows, MLeft::NumCols>
+auto operator+(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(_idxv(A, 0, 0) + B), MLeft::NumRows, MLeft::NumCols>
 {
-    Matrix<decltype(A[0][0] * B), MLeft::NumRows, MLeft::NumCols> result(A);
+    Matrix<decltype(_idxv(A, 0, 0) + B), MLeft::NumRows, MLeft::NumCols> result(A);
 
     for (auto& el : result.data)
     {
@@ -204,7 +226,7 @@ auto operator+(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(A[0][0] + B
 
 
 template <typename MRight>
-auto operator+(typename MRight::Scalar B, MRight A) -> Matrix<decltype(A[0][0] + B), MRight::NumRows, MRight::NumCols>
+auto operator+(typename MRight::Scalar B, MRight A) -> Matrix<decltype(_idxv(A, 0, 0) + B), MRight::NumRows, MRight::NumCols>
 {
     return A + B;
 }
