@@ -67,6 +67,8 @@ struct Matrix {
 
     std::span<Scalar, Cols> operator[](size_t index)
     {
+        assert(index < Rows);
+        assert(index >= 0);
         return std::span<Scalar, Cols> {&data[index * Cols], Cols};
     }
 
