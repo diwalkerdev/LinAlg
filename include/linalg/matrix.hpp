@@ -38,8 +38,17 @@ struct Matrix {
     template <size_t M, size_t N>
     Matrix(ScalarType const (&initializer)[M][N])
     {
-        static_assert(M == NumRows);
-        static_assert(N == NumCols);
+        // If we have are getting passed a 1d init list, then make sure our matrix is a vector.
+        if constexpr (M == 1)
+        {
+            static_assert((N == NumCols && NumRows == 1) || (N == NumRows && NumCols == 1));
+        }
+        else
+        {
+            static_assert(M == NumRows);
+            static_assert(N == NumCols);
+        }
+
         std::copy_n(&initializer[0][0], M * N, data.begin());
     }
 
@@ -67,15 +76,22 @@ struct Matrix {
 
     auto operator[](size_t index)
     {
-        assert(index < Rows);
         assert(index >= 0);
-        if constexpr (Cols > 1)
+
+        if constexpr (Cols == 1)
         {
-            return std::span<Scalar, Cols> {&data[index * Cols], Cols};
+            assert(index < Rows);
+            return data[index];
+        }
+        else if constexpr (Rows == 1)
+        {
+            assert(index < Cols);
+            return data[index];
         }
         else
         {
-            return data[index];
+            assert(index < Rows);
+            return std::span<Scalar, Cols> {&data[index * Cols], Cols};
         }
     }
 
@@ -254,13 +270,20 @@ auto cols(MAT& mat, int const (&values)[N]) -> linalg::Matrix<typename MAT::Scal
 }
 
 template <size_t Rows, size_t Cols>
-using Matrixi = Matrix<int, Rows, Cols>;
-
-template <size_t Rows, size_t Cols>
 using Matrixf = Matrix<float, Rows, Cols>;
 
 template <size_t Rows, size_t Cols>
 using Matrixd = Matrix<double, Rows, Cols>;
+
+
+template <typename Scalar, size_t Rows>
+using Vector = Matrix<Scalar, Rows, 1>;
+
+template <size_t Rows>
+using Vectorf = Matrix<float, Rows, 1>;
+
+template <size_t Rows>
+using Vectord = Matrix<double, Rows, 1>;
 
 } // end namespace linalg
 
