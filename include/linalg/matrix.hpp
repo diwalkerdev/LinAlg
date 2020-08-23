@@ -14,58 +14,58 @@
 
 namespace linalg {
 
-template <std::floating_point ScalarType, size_t Rows, size_t Cols>
+template <std::floating_point Tp, size_t Rows, size_t Cols>
 struct Matrix {
-    static const size_t NumCols = Cols;
-    static const size_t NumRows = Rows;
-    static const size_t Size    = Cols * Rows;
+    static constexpr auto size() noexcept { return Rows * Cols; }
+    static constexpr auto rows() noexcept { return Rows; }
+    static constexpr auto cols() noexcept { return Cols; }
 
-    using Scalar  = ScalarType;
-    using RowType = std::span<Scalar>;
-    std::array<Scalar, Cols * Rows> data;
+    using value_type = Tp;
 
-    Matrix()                                        = default;
-    Matrix(Matrix<Scalar, Rows, Cols> const& other) = default;
-    Matrix(Matrix<Scalar, Rows, Cols>&& other)      = default;
-    Matrix<Scalar, Rows, Cols>& operator=(Matrix<Scalar, Rows, Cols> const& other) = default;
-    Matrix<Scalar, Rows, Cols>& operator=(Matrix<Scalar, Rows, Cols>&& other) = default;
+    std::array<value_type, Rows * Cols> data;
 
-    Matrix(ScalarType const (&initializer)[1])
+    Matrix()                                            = default;
+    Matrix(Matrix<value_type, Rows, Cols> const& other) = default;
+    Matrix(Matrix<value_type, Rows, Cols>&& other)      = default;
+    Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols> const& other) = default;
+    Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols>&& other) = default;
+
+    Matrix(Tp const (&initializer)[1])
     {
         std::fill(data.begin(), data.end(), initializer[0]);
     }
 
     template <size_t M, size_t N>
-    Matrix(ScalarType const (&initializer)[M][N])
+    Matrix(Tp const (&initializer)[M][N])
     {
         // If we have are getting passed a 1d init list, then make sure our matrix is a vector.
         if constexpr (M == 1)
         {
-            static_assert((N == NumCols && NumRows == 1) || (N == NumRows && NumCols == 1));
+            static_assert((N == cols() && rows() == 1) || (N == rows() && cols() == 1));
         }
         else
         {
-            static_assert(M == NumRows);
-            static_assert(N == NumCols);
+            static_assert(M == rows());
+            static_assert(N == cols());
         }
 
-        std::copy_n(&initializer[0][0], M * N, data.begin());
+        std::copy_n(&initializer[0][0], size(), data.begin());
     }
 
     // static
-    // Matrix<Scalar, Rows, Cols> zero()
+    // Matrix<value_type, Rows, Cols> zero()
     // {
-    //     Matrix<Scalar, Rows, Cols> m;
+    //     Matrix<value_type, Rows, Cols> m;
     //     ::zero(m);
     //     return m;
     // }
 
     // static
-    // Matrix<Scalar, Rows, Cols> I()
+    // Matrix<value_type, Rows, Cols> I()
     // {
     //     static_assert(Rows == Cols, "Matrix is not square");
 
-    //     Matrix<Scalar, Rows, Cols> m;
+    //     Matrix<value_type, Rows, Cols> m;
     //     ::zero(m);
     //     for (int i=0; i < Rows; ++i) {
     //         m[i][i] = 1;
@@ -91,11 +91,11 @@ struct Matrix {
         else
         {
             assert(index < Rows);
-            return std::span<Scalar, Cols> {&data[index * Cols], Cols};
+            return std::span<value_type, Cols> {&data[index * Cols], Cols};
         }
     }
 
-    // Matrix<Scalar, Rows, Cols>& operator=(Matrix<Scalar, Rows, Cols> other)
+    // Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols> other)
     // {
     //     std::cout << "matrix matrix assign" << std::endl;
     //     this->data = std::make_shared<array2d>();
@@ -110,7 +110,7 @@ struct Matrix {
     //     return *this;
     // }
 
-    // Matrix<Scalar, Rows, Cols>& operator=(const std::array<Scalar, Rows*Cols>
+    // Matrix<value_type, Rows, Cols>& operator=(const std::array<value_type, Rows*Cols>
     // &other)
     // {
     //     std::cout << "matrix array assign" << std::endl;
@@ -135,30 +135,30 @@ struct Matrix {
 template <typename M>
 inline auto _idx(M& mat, size_t r, size_t c) -> float*
 {
-    return &mat.data[0] + ((r * M::NumCols) + c);
+    return &mat.data[0] + ((r * M::cols()) + c);
 }
 
 template <typename M>
 inline auto _idxv(M const& mat, size_t r, size_t c) -> float
 {
-    return *(&mat.data[0] + ((r * M::NumCols) + c));
+    return *(&mat.data[0] + ((r * M::cols()) + c));
 }
 
 template <typename MLeft, typename MRight>
-auto operator*(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) * _idxv(B, 0, 0)), MLeft::NumRows, MRight::NumCols>
+auto operator*(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) * _idxv(B, 0, 0)), MLeft::rows(), MRight::cols()>
 {
-    static_assert(MLeft::NumCols == MRight::NumRows,
+    static_assert(MLeft::cols() == MRight::rows(),
                   "Invalid matrix dimensions.");
 
-    Matrix<decltype(_idxv(A, 0, 0) * _idxv(B, 0, 0)), MLeft::NumRows, MRight::NumCols> result {{0}};
+    Matrix<decltype(_idxv(A, 0, 0) * _idxv(B, 0, 0)), MLeft::rows(), MRight::cols()> result {{0}};
 
     size_t i, j, k;
 
-    for (i = 0; i < MLeft::NumRows; ++i)
+    for (i = 0; i < MLeft::rows(); ++i)
     {
-        for (j = 0; j < MRight::NumCols; ++j)
+        for (j = 0; j < MRight::cols(); ++j)
         {
-            for (k = 0; k < MLeft::NumCols; ++k)
+            for (k = 0; k < MLeft::cols(); ++k)
             {
                 *_idx(result, i, j) += _idxv(A, i, k) * _idxv(B, k, j);
             }
@@ -170,10 +170,9 @@ auto operator*(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) * _idxv(B, 0
 
 
 template <typename MLeft>
-auto operator*(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::NumRows, MLeft::NumCols>
+auto operator*(MLeft A, typename MLeft::value_type B) -> Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::rows(), MLeft::cols()>
 {
-    Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::NumRows, MLeft::NumCols>
-        result(A);
+    Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::rows(), MLeft::cols()> result(A);
 
     for (auto& el : result.data)
     {
@@ -185,14 +184,14 @@ auto operator*(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(_idxv(A, 0,
 
 
 template <typename MRight>
-auto operator*(typename MRight::Scalar B, MRight A) -> Matrix<decltype(_idxv(A, 0, 0) * B), MRight::NumRows, MRight::NumCols>
+auto operator*(typename MRight::value_type B, MRight A) -> Matrix<decltype(_idxv(A, 0, 0) * B), MRight::rows(), MRight::cols()>
 {
     return A * B;
 }
 
 
 template <typename MLeft>
-auto operator*=(MLeft& A, typename MLeft::Scalar B) -> Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::NumRows, MLeft::NumCols>
+auto operator*=(MLeft& A, typename MLeft::value_type B) -> Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::rows(), MLeft::cols()>
 {
     for (auto& el : A.data)
     {
@@ -204,20 +203,20 @@ auto operator*=(MLeft& A, typename MLeft::Scalar B) -> Matrix<decltype(_idxv(A, 
 
 
 template <typename MLeft, typename MRight>
-auto operator+(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) + _idxv(B, 0, 0)), MLeft::NumRows, MRight::NumCols>
+auto operator+(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) + _idxv(B, 0, 0)), MLeft::rows(), MRight::cols()>
 {
-    static_assert(MLeft::NumCols == MRight::NumCols,
+    static_assert(MLeft::cols() == MRight::cols(),
                   "Invalid matrix dimensions.");
-    static_assert(MLeft::NumRows == MRight::NumRows,
+    static_assert(MLeft::rows() == MRight::rows(),
                   "Invalid matrix dimensions.");
 
-    Matrix<decltype(_idxv(A, 0, 0) + _idxv(B, 0, 0)), MLeft::NumRows, MRight::NumCols> result;
+    Matrix<decltype(_idxv(A, 0, 0) + _idxv(B, 0, 0)), MLeft::rows(), MRight::cols()> result;
 
     size_t i, j;
 
-    for (i = 0; i < MLeft::NumRows; ++i)
+    for (i = 0; i < MLeft::rows(); ++i)
     {
-        for (j = 0; j < MRight::NumCols; ++j)
+        for (j = 0; j < MRight::cols(); ++j)
         {
             *_idx(result, i, j) = _idxv(A, i, j) + _idxv(B, i, j);
         }
@@ -228,9 +227,9 @@ auto operator+(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) + _idxv(B, 0
 
 
 template <typename MLeft>
-auto operator+(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(_idxv(A, 0, 0) + B), MLeft::NumRows, MLeft::NumCols>
+auto operator+(MLeft A, typename MLeft::value_type B) -> Matrix<decltype(_idxv(A, 0, 0) + B), MLeft::rows(), MLeft::cols()>
 {
-    Matrix<decltype(_idxv(A, 0, 0) + B), MLeft::NumRows, MLeft::NumCols> result(A);
+    Matrix<decltype(_idxv(A, 0, 0) + B), MLeft::rows(), MLeft::cols()> result(A);
 
     for (auto& el : result.data)
     {
@@ -242,7 +241,7 @@ auto operator+(MLeft A, typename MLeft::Scalar B) -> Matrix<decltype(_idxv(A, 0,
 
 
 template <typename MRight>
-auto operator+(typename MRight::Scalar B, MRight A) -> Matrix<decltype(_idxv(A, 0, 0) + B), MRight::NumRows, MRight::NumCols>
+auto operator+(typename MRight::value_type B, MRight A) -> Matrix<decltype(_idxv(A, 0, 0) + B), MRight::rows(), MRight::cols()>
 {
     return A + B;
 }
@@ -250,16 +249,16 @@ auto operator+(typename MRight::Scalar B, MRight A) -> Matrix<decltype(_idxv(A, 
 //////////////////////////////////////////////////////////////////////////////
 
 template <typename MAT, size_t N>
-auto cols(MAT& mat, int const (&values)[N]) -> linalg::Matrix<typename MAT::Scalar, MAT::NumRows, N>
+auto cols(MAT& mat, int const (&values)[N]) -> linalg::Matrix<typename MAT::value_type, MAT::rows(), N>
 {
-    linalg::Matrix<typename MAT::Scalar, MAT::NumRows, N> other;
+    linalg::Matrix<typename MAT::value_type, MAT::rows(), N> other;
 
     int dst = 0;
     for (auto src : values)
     {
-        assert(src < MAT::NumCols);
+        assert(src < MAT::cols());
 
-        for (int r : irange<MAT::NumRows>())
+        for (int r : irange<MAT::rows()>())
         {
             other[r][dst] = mat[r][src];
         }
@@ -276,8 +275,8 @@ template <size_t Rows, size_t Cols>
 using Matrixd = Matrix<double, Rows, Cols>;
 
 
-template <typename Scalar, size_t Rows>
-using Vector = Matrix<Scalar, Rows, 1>;
+template <typename value_type, size_t Rows>
+using Vector = Matrix<value_type, Rows, 1>;
 
 template <size_t Rows>
 using Vectorf = Matrix<float, Rows, 1>;
@@ -290,10 +289,10 @@ using Vectord = Matrix<double, Rows, 1>;
 //////////////////////////////////////////////////////////////////////////////
 
 template <typename M>
-auto iter(M& mat) -> std::array<typename M::RowType, M::NumRows>
+auto iter(M& mat) -> std::array<std::span<typename M::value_type>, M::rows()>
 {
-    std::array<typename M::RowType, M::NumRows> v;
-    for (auto i : irange<M::NumRows>())
+    std::array<std::span<typename M::value_type>, M::rows()> v;
+    for (auto i : irange<M::rows()>())
     {
         v[i] = mat[i];
     }
@@ -302,9 +301,9 @@ auto iter(M& mat) -> std::array<typename M::RowType, M::NumRows>
 
 //////////////////////////////////////////////////////////////////////////////
 
-template <typename Scalar, size_t Rows, size_t Cols>
-std::ostream& operator<<(std::ostream&                       os,
-                         linalg::Matrix<Scalar, Rows, Cols>& A)
+template <typename value_type, size_t Rows, size_t Cols>
+std::ostream& operator<<(std::ostream&                           os,
+                         linalg::Matrix<value_type, Rows, Cols>& A)
 {
     for (auto const& row : iter(A))
     {
