@@ -14,15 +14,29 @@
 
 namespace linalg {
 
-template <std::floating_point Tp, size_t Rows, size_t Cols>
+template <std::floating_point Tp, std::size_t Rows, std::size_t Cols>
 struct Matrix {
     static constexpr auto size() noexcept { return Rows * Cols; }
     static constexpr auto rows() noexcept { return Rows; }
     static constexpr auto cols() noexcept { return Cols; }
 
-    using value_type = Tp;
+    using value_type      = Tp;
+    using reference       = value_type&;
+    using const_reference = const value_type&;
+    using iterator        = value_type*;
+    using const_iterator  = value_type const*;
+    using size_type       = std::size_t;
 
-    std::array<value_type, Rows * Cols> data;
+    value_type _elems[Rows * Cols];
+
+    inline value_type*       data() noexcept { return _elems; }
+    inline value_type const* data() const noexcept { return _elems; }
+
+    // iterators:
+    inline constexpr iterator       begin() noexcept { return iterator(data()); }
+    inline constexpr const_iterator begin() const noexcept { return const_iterator(data()); }
+    inline constexpr iterator       end() noexcept { return iterator(data() + size()); }
+    inline constexpr const_iterator end() const noexcept { return const_iterator(data() + size()); }
 
     Matrix()                                            = default;
     Matrix(Matrix<value_type, Rows, Cols> const& other) = default;
@@ -30,9 +44,16 @@ struct Matrix {
     Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols> const& other) = default;
     Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols>&& other) = default;
 
-    Matrix(Tp const (&initializer)[1])
+    Matrix(Tp value)
     {
-        std::fill(data.begin(), data.end(), initializer[0]);
+        std::fill(begin(), end(), value);
+    }
+
+    template <size_type N>
+    Matrix(Tp const (&initializer)[N])
+    {
+        static_assert((N == cols() && rows() == 1) || (N == rows() && cols() == 1));
+        std::copy_n(&initializer[0], size(), begin());
     }
 
     template <size_t M, size_t N>
@@ -49,7 +70,7 @@ struct Matrix {
             static_assert(N == cols());
         }
 
-        std::copy_n(&initializer[0][0], size(), data.begin());
+        std::copy_n(&initializer[0][0], size(), begin());
     }
 
     // static
@@ -81,30 +102,30 @@ struct Matrix {
         if constexpr (Cols == 1)
         {
             assert(index < Rows);
-            return data[index];
+            return _elems[index];
         }
         else if constexpr (Rows == 1)
         {
             assert(index < Cols);
-            return data[index];
+            return _elems[index];
         }
         else
         {
             assert(index < Rows);
-            return std::span<value_type, Cols> {&data[index * Cols], Cols};
+            return std::span<value_type, Cols>{&_elems[index * Cols], Cols};
         }
     }
 
     // Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols> other)
     // {
     //     std::cout << "matrix matrix assign" << std::endl;
-    //     this->data = std::make_shared<array2d>();
+    //     this->_elems = std::make_shared<array2d>();
 
     //     for (size_t i = 0; i < Rows; ++i)
     //     {
     //         for (size_t j = 0; j < Cols; ++j)
     //         {
-    //             (*data)[i][j] = (*other.data)[i][j];
+    //             (*_elems)[i][j] = (*other._elems)[i][j];
     //         }
     //     }
     //     return *this;
@@ -114,43 +135,65 @@ struct Matrix {
     // &other)
     // {
     //     std::cout << "matrix array assign" << std::endl;
-    //     this->data = std::make_shared<array2d>();
+    //     this->_elems = std::make_shared<array2d>();
 
     //     for (size_t i = 0; i < Rows; ++i)
     //     {
     //         for (size_t j = 0; j < Cols; ++j)
     //         {
-    //             (*data)[i][j] = other[i*Cols + j];
+    //             (*_elems)[i][j] = other[i*Cols + j];
     //         }
     //     }
     //     return (*this);
     // }
 };
 
+// template <class _Tp, class... _Args, class = std::enable_if<std::all<std::is_same<_Tp, _Args>::value...>::value>>
+// array(_Tp, _Args...)
+//     -> array<_Tp, 1 + sizeof...(_Args)>;
+
 //////////////////////////////////////////////////////////////////////////////
 
-// _idx avoids the use of the [] operator. This is expected to be useful when
-// vectors are added as it allows vectors and matrices to use the same code,
+// _idx avoids the use of Matrix::operator[].
+// This  allows vectors and matrices to use the same code:
 // i.e. vectors are matrices where one of the dimensions is 1.
-template <typename M>
-inline auto _idx(M& mat, size_t r, size_t c) -> float*
+
+
+template <typename MatRef,
+          typename Mat = std::remove_reference_t<MatRef>>
+auto _idx(MatRef&& mat, size_t r, size_t c) -> typename Mat::reference
 {
-    return &mat.data[0] + ((r * M::cols()) + c);
+    return mat._elems[(r * mat.cols()) + c];
 }
 
-template <typename M>
-inline auto _idxv(M const& mat, size_t r, size_t c) -> float
-{
-    return *(&mat.data[0] + ((r * M::cols()) + c));
-}
+/*
+Explanation of template madness.
 
-template <typename MLeft, typename MRight>
-auto operator*(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) * _idxv(B, 0, 0)), MLeft::rows(), MRight::cols()>
+Operator* uses perfect forwarding so l and r value references can be passed to the function.
+This means the type passed in could be a reference (i.e T&). You can't use :: on a reference, hence remove_reference_t.
+
+Because operator* is templated, scalars also match, which we don't want (use SFINAE).
+Remove scalars by enable_if_t. disjunction and is floating point is used to check both parameters are not floats.
+*/
+template <typename MLeftRef,
+          typename MRightRef,
+          typename MLeft  = std::remove_reference_t<MLeftRef>,
+          typename MRight = std::remove_reference_t<MRightRef>>
+auto operator*(MLeftRef&& A, MRightRef&& B)
+    -> std::enable_if_t<
+        !std::disjunction_v<std::is_floating_point<MLeft>,
+                            std::is_floating_point<MRight>>,
+        Matrix<decltype(_idx(A, 0, 0) * _idx(B, 0, 0)),
+               MLeft::rows(),
+               MRight::cols()>>
 {
     static_assert(MLeft::cols() == MRight::rows(),
                   "Invalid matrix dimensions.");
 
-    Matrix<decltype(_idxv(A, 0, 0) * _idxv(B, 0, 0)), MLeft::rows(), MRight::cols()> result {{0}};
+    Matrix<decltype(_idx(A, 0, 0) * _idx(B, 0, 0)),
+           MLeft::rows(),
+           MRight::cols()>
+        result{0};
 
     size_t i, j, k;
 
@@ -160,7 +203,7 @@ auto operator*(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) * _idxv(B, 0
         {
             for (k = 0; k < MLeft::cols(); ++k)
             {
-                *_idx(result, i, j) += _idxv(A, i, k) * _idxv(B, k, j);
+                _idx(result, i, j) += _idx(A, i, k) * _idx(B, k, j);
             }
         }
     }
@@ -169,12 +212,16 @@ auto operator*(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) * _idxv(B, 0
 }
 
 
-template <typename MLeft>
-auto operator*(MLeft A, typename MLeft::value_type B) -> Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::rows(), MLeft::cols()>
+template <typename MLeftRef,
+          typename MLeft = std::remove_reference_t<MLeftRef>>
+auto operator*(MLeftRef&& A, typename MLeft::value_type B)
 {
-    Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::rows(), MLeft::cols()> result(A);
+    Matrix<decltype(_idx(std::forward<MLeftRef>(A), 0, 0) * B),
+           MLeft::rows(),
+           MLeft::cols()>
+        result(A);
 
-    for (auto& el : result.data)
+    for (auto& el : result._elems)
     {
         el *= B;
     }
@@ -182,18 +229,22 @@ auto operator*(MLeft A, typename MLeft::value_type B) -> Matrix<decltype(_idxv(A
     return result;
 }
 
+/*
 
 template <typename MRight>
-auto operator*(typename MRight::value_type B, MRight A) -> Matrix<decltype(_idxv(A, 0, 0) * B), MRight::rows(), MRight::cols()>
+auto operator*(typename std::remove_reference_t<MRight>::value_type B, MRight&& A)
+    -> Matrix<decltype(_idx(std::forward<MRight>(A), 0, 0) * B),
+              MRight::rows(),
+              MRight::cols()>
 {
-    return A * B;
+    return A * std::forward(B);
 }
+*/
 
-
-template <typename MLeft>
-auto operator*=(MLeft& A, typename MLeft::value_type B) -> Matrix<decltype(_idxv(A, 0, 0) * B), MLeft::rows(), MLeft::cols()>
+template <typename MLeft, typename Tp>
+auto operator*=(MLeft&& A, Tp B) -> MLeft
 {
-    for (auto& el : A.data)
+    for (auto& el : A._elems)
     {
         el *= B;
     }
@@ -203,14 +254,14 @@ auto operator*=(MLeft& A, typename MLeft::value_type B) -> Matrix<decltype(_idxv
 
 
 template <typename MLeft, typename MRight>
-auto operator+(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) + _idxv(B, 0, 0)), MLeft::rows(), MRight::cols()>
+auto operator+(MLeft&& A, MRight&& B) -> Matrix<decltype(_idx(A, 0, 0) + _idx(B, 0, 0)), MLeft::rows(), MRight::cols()>
 {
     static_assert(MLeft::cols() == MRight::cols(),
                   "Invalid matrix dimensions.");
     static_assert(MLeft::rows() == MRight::rows(),
                   "Invalid matrix dimensions.");
 
-    Matrix<decltype(_idxv(A, 0, 0) + _idxv(B, 0, 0)), MLeft::rows(), MRight::cols()> result;
+    Matrix<decltype(_idx(A, 0, 0) + _idx(B, 0, 0)), MLeft::rows(), MRight::cols()> result;
 
     size_t i, j;
 
@@ -218,7 +269,7 @@ auto operator+(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) + _idxv(B, 0
     {
         for (j = 0; j < MRight::cols(); ++j)
         {
-            *_idx(result, i, j) = _idxv(A, i, j) + _idxv(B, i, j);
+            _idx(result, i, j) = _idx(A, i, j) + _idx(B, i, j);
         }
     }
 
@@ -227,11 +278,11 @@ auto operator+(MLeft A, MRight B) -> Matrix<decltype(_idxv(A, 0, 0) + _idxv(B, 0
 
 
 template <typename MLeft>
-auto operator+(MLeft A, typename MLeft::value_type B) -> Matrix<decltype(_idxv(A, 0, 0) + B), MLeft::rows(), MLeft::cols()>
+auto operator+(MLeft&& A, typename MLeft::value_type B) -> Matrix<decltype(_idx(A, 0, 0) + B), MLeft::rows(), MLeft::cols()>
 {
-    Matrix<decltype(_idxv(A, 0, 0) + B), MLeft::rows(), MLeft::cols()> result(A);
+    Matrix<decltype(_idx(A, 0, 0) + B), MLeft::rows(), MLeft::cols()> result(A);
 
-    for (auto& el : result.data)
+    for (auto& el : result._elems)
     {
         el += B;
     }
@@ -241,7 +292,7 @@ auto operator+(MLeft A, typename MLeft::value_type B) -> Matrix<decltype(_idxv(A
 
 
 template <typename MRight>
-auto operator+(typename MRight::value_type B, MRight A) -> Matrix<decltype(_idxv(A, 0, 0) + B), MRight::rows(), MRight::cols()>
+auto operator+(typename MRight::value_type B, MRight&& A) -> Matrix<decltype(_idx(A, 0, 0) + B), MRight::rows(), MRight::cols()>
 {
     return A + B;
 }
