@@ -154,14 +154,45 @@ struct Matrix {
 
 //////////////////////////////////////////////////////////////////////////////
 
+// Type Traits to identify matrix types
+//
+template <typename Tp>
+struct is_matrix : std::false_type {
+};
+
+template <typename Tp, std::size_t M, std::size_t N>
+struct is_matrix<Matrix<Tp, M, N>> : std::true_type {
+};
+
+template <typename Tp, std::size_t M, std::size_t N>
+struct is_matrix<const Matrix<Tp, M, N>> : std::true_type {
+};
+
+template <typename T>
+inline constexpr bool is_matrix_v = is_matrix<T>::value;
+
+//////////////////////////////////////////////////////////////////////////////
+
 // _idx avoids the use of Matrix::operator[].
 // This  allows vectors and matrices to use the same code:
 // i.e. vectors are matrices where one of the dimensions is 1.
 
+template <typename MatRef,
+          typename Mat = std::remove_reference_t<MatRef>>
+auto _idx(MatRef const& mat, size_t r, size_t c)
+    -> std::enable_if_t<
+        is_matrix<Mat>::value,
+        typename Mat::value_type>
+{
+    return mat._elems[(r * mat.cols()) + c];
+}
 
 template <typename MatRef,
           typename Mat = std::remove_reference_t<MatRef>>
-auto _idx(MatRef&& mat, size_t r, size_t c) -> typename Mat::reference
+auto _idx(MatRef&& mat, size_t r, size_t c)
+    -> std::enable_if_t<
+        is_matrix<Mat>::value,
+        typename Mat::reference>
 {
     return mat._elems[(r * mat.cols()) + c];
 }
@@ -181,8 +212,8 @@ template <typename MLeftRef,
           typename MRight = std::remove_reference_t<MRightRef>>
 auto operator*(MLeftRef&& A, MRightRef&& B)
     -> std::enable_if_t<
-        !std::disjunction_v<std::is_floating_point<MLeft>,
-                            std::is_floating_point<MRight>>,
+        std::conjunction_v<is_matrix<MLeft>,
+                           is_matrix<MRight>>,
         Matrix<decltype(_idx(A, 0, 0) * _idx(B, 0, 0)),
                MLeft::rows(),
                MRight::cols()>>
@@ -215,11 +246,9 @@ auto operator*(MLeftRef&& A, MRightRef&& B)
 template <typename MLeftRef,
           typename MLeft = std::remove_reference_t<MLeftRef>>
 auto operator*(MLeftRef&& A, typename MLeft::value_type B)
+    -> std::enable_if_t<is_matrix<MLeft>::value, MLeft>
 {
-    Matrix<decltype(_idx(std::forward<MLeftRef>(A), 0, 0) * B),
-           MLeft::rows(),
-           MLeft::cols()>
-        result(A);
+    MLeft result(A);
 
     for (auto& el : result._elems)
     {
@@ -229,20 +258,20 @@ auto operator*(MLeftRef&& A, typename MLeft::value_type B)
     return result;
 }
 
-/*
 
-template <typename MRight>
-auto operator*(typename std::remove_reference_t<MRight>::value_type B, MRight&& A)
-    -> Matrix<decltype(_idx(std::forward<MRight>(A), 0, 0) * B),
-              MRight::rows(),
-              MRight::cols()>
+template <typename MRightRef,
+          typename MRight = std::remove_reference_t<MRightRef>>
+auto operator*(typename MRight::value_type B, MRightRef&& A)
+    -> std::enable_if_t<is_matrix<MRight>::value, MRight>
 {
-    return A * std::forward(B);
+    return A * B;
 }
-*/
 
-template <typename MLeft, typename Tp>
-auto operator*=(MLeft&& A, Tp B) -> MLeft
+
+template <typename MLeftRef,
+          typename MLeft = std::remove_reference_t<MLeftRef>>
+auto operator*=(MLeftRef&& A, typename MLeft::value_type B)
+    -> std::enable_if_t<is_matrix<MLeft>::value, MLeft>
 {
     for (auto& el : A._elems)
     {
@@ -253,8 +282,16 @@ auto operator*=(MLeft&& A, Tp B) -> MLeft
 }
 
 
-template <typename MLeft, typename MRight>
-auto operator+(MLeft&& A, MRight&& B) -> Matrix<decltype(_idx(A, 0, 0) + _idx(B, 0, 0)), MLeft::rows(), MRight::cols()>
+template <typename MLeftRef,
+          typename MRightRef,
+          typename MLeft  = std::remove_reference_t<MLeftRef>,
+          typename MRight = std::remove_reference_t<MRightRef>>
+auto operator+(MLeftRef&& A, MRightRef&& B)
+    -> std::enable_if_t<
+        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>,
+        Matrix<decltype(_idx(A, 0, 0) + _idx(B, 0, 0)),
+               MLeft::rows(),
+               MRight::cols()>>
 {
     static_assert(MLeft::cols() == MRight::cols(),
                   "Invalid matrix dimensions.");
@@ -277,10 +314,12 @@ auto operator+(MLeft&& A, MRight&& B) -> Matrix<decltype(_idx(A, 0, 0) + _idx(B,
 }
 
 
-template <typename MLeft>
-auto operator+(MLeft&& A, typename MLeft::value_type B) -> Matrix<decltype(_idx(A, 0, 0) + B), MLeft::rows(), MLeft::cols()>
+template <typename MLeftRef,
+          typename MLeft = std::remove_reference_t<MLeftRef>>
+auto operator+(MLeftRef&& A, typename MLeft::value_type B)
+    -> std::enable_if_t<is_matrix<MLeft>::value, MLeft>
 {
-    Matrix<decltype(_idx(A, 0, 0) + B), MLeft::rows(), MLeft::cols()> result(A);
+    auto result(A);
 
     for (auto& el : result._elems)
     {
@@ -291,10 +330,25 @@ auto operator+(MLeft&& A, typename MLeft::value_type B) -> Matrix<decltype(_idx(
 }
 
 
-template <typename MRight>
-auto operator+(typename MRight::value_type B, MRight&& A) -> Matrix<decltype(_idx(A, 0, 0) + B), MRight::rows(), MRight::cols()>
+template <typename MRightRef,
+          typename MRight = std::remove_reference_t<MRightRef>>
+auto operator+(typename MRight::value_type B, MRightRef&& A)
+    -> std::enable_if_t<is_matrix<MRight>::value, MRight>
 {
     return A + B;
+}
+
+template <typename MLeftRef,
+          typename MLeft = std::remove_reference_t<MLeftRef>>
+auto operator+=(MLeftRef&& A, typename MLeft::value_type B)
+    -> std::enable_if_t<is_matrix<MLeft>::value, MLeft>
+{
+    for (auto& el : A._elems)
+    {
+        el += B;
+    }
+
+    return A;
 }
 
 //////////////////////////////////////////////////////////////////////////////
