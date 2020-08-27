@@ -14,7 +14,9 @@
 
 namespace linalg {
 
-template <std::floating_point Tp, std::size_t Rows, std::size_t Cols>
+// TODO: Use floating_point concept again when osx updates.
+// template <std::floating_point Tp, std::size_t Rows, std::size_t Cols>
+template <typename Tp, std::size_t Rows, std::size_t Cols>
 struct Matrix {
     static constexpr auto size() noexcept { return Rows * Cols; }
     static constexpr auto rows() noexcept { return Rows; }
