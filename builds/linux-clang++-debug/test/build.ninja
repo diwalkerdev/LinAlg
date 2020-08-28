@@ -1,0 +1,43 @@
+include $
+    /home/dwalker0044/Projects/ShapeAttack/builds/linux-clang++-debug/rules.ninja
+
+build $
+    /home/dwalker0044/Projects/ShapeAttack/builds/linux-clang++-debug/test/meliorate_gen.o: $
+    compile /home/dwalker0044/Projects/ShapeAttack/test/meliorate_gen.cpp
+  compiler = clang++
+  includes = -I/usr/include/SDL2 $
+      -I/home/dwalker0044/Projects/ShapeAttack/include $
+      -I/home/dwalker0044/Projects/ShapeAttack/lib/Meliorate/include $
+      -I/home/dwalker0044/Projects/ShapeAttack/lib/LinAlg/include
+  flags = -std=c++20 -O1 -g -fsanitize=address -fno-omit-frame-pointer $
+      -fsanitize=undefined
+  defines = 
+
+build $
+    /home/dwalker0044/Projects/ShapeAttack/builds/linux-clang++-debug/test/test_maths.o: $
+    compile /home/dwalker0044/Projects/ShapeAttack/test/test_maths.cpp
+  compiler = clang++
+  includes = -I/usr/include/SDL2 $
+      -I/home/dwalker0044/Projects/ShapeAttack/include $
+      -I/home/dwalker0044/Projects/ShapeAttack/lib/Meliorate/include $
+      -I/home/dwalker0044/Projects/ShapeAttack/lib/LinAlg/include
+  flags = -std=c++20 -O1 -g -fsanitize=address -fno-omit-frame-pointer $
+      -fsanitize=undefined
+  defines = 
+
+build Tests.exe: exe $
+    /home/dwalker0044/Projects/ShapeAttack/builds/linux-clang++-debug/test/meliorate_gen.o $
+    /home/dwalker0044/Projects/ShapeAttack/builds/linux-clang++-debug/test/test_maths.o
+  compiler = clang++
+  includes = -I/usr/include/SDL2 $
+      -I/home/dwalker0044/Projects/ShapeAttack/include $
+      -I/home/dwalker0044/Projects/ShapeAttack/lib/Meliorate/include $
+      -I/home/dwalker0044/Projects/ShapeAttack/lib/LinAlg/include
+  flags = -std=c++20 -O1 -g -fsanitize=address -fno-omit-frame-pointer $
+      -fsanitize=undefined
+  defines = 
+  exe_name = Tests.exe
+  linker_args = -Wl,-rpath='$$ORIGIN' -lSDL2
+
+build test: phony Tests.exe
+

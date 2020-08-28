@@ -1,0 +1,43 @@
+include $
+    /Users/davidwalker/Projects/ShapeAttack/builds/osx-clang++-debug/rules.ninja
+
+build $
+    /Users/davidwalker/Projects/ShapeAttack/builds/osx-clang++-debug/test/test_maths.o: $
+    compile /Users/davidwalker/Projects/ShapeAttack/test/test_maths.cpp
+  compiler = clang++
+  includes = -I/usr/local/Cellar/sdl2/2.0.12_1/include/SDL2 $
+      -I/Users/davidwalker/Projects/ShapeAttack/include $
+      -I/Users/davidwalker/Projects/ShapeAttack/lib/Meliorate/include $
+      -I/Users/davidwalker/Projects/ShapeAttack/lib/LinAlg/include
+  flags = -std=c++2a -O1 -g -fsanitize=address -fno-omit-frame-pointer $
+      -fsanitize=undefined
+  defines = 
+
+build $
+    /Users/davidwalker/Projects/ShapeAttack/builds/osx-clang++-debug/test/meliorate_gen.o: $
+    compile /Users/davidwalker/Projects/ShapeAttack/test/meliorate_gen.cpp
+  compiler = clang++
+  includes = -I/usr/local/Cellar/sdl2/2.0.12_1/include/SDL2 $
+      -I/Users/davidwalker/Projects/ShapeAttack/include $
+      -I/Users/davidwalker/Projects/ShapeAttack/lib/Meliorate/include $
+      -I/Users/davidwalker/Projects/ShapeAttack/lib/LinAlg/include
+  flags = -std=c++2a -O1 -g -fsanitize=address -fno-omit-frame-pointer $
+      -fsanitize=undefined
+  defines = 
+
+build Tests.exe: exe $
+    /Users/davidwalker/Projects/ShapeAttack/builds/osx-clang++-debug/test/test_maths.o $
+    /Users/davidwalker/Projects/ShapeAttack/builds/osx-clang++-debug/test/meliorate_gen.o
+  compiler = clang++
+  includes = -I/usr/local/Cellar/sdl2/2.0.12_1/include/SDL2 $
+      -I/Users/davidwalker/Projects/ShapeAttack/include $
+      -I/Users/davidwalker/Projects/ShapeAttack/lib/Meliorate/include $
+      -I/Users/davidwalker/Projects/ShapeAttack/lib/LinAlg/include
+  flags = -std=c++2a -O1 -g -fsanitize=address -fno-omit-frame-pointer $
+      -fsanitize=undefined
+  defines = 
+  exe_name = Tests.exe
+  linker_args = -rpath '@executable_path' -lSDL2
+
+build test: phony Tests.exe
+

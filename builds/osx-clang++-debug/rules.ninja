@@ -1,0 +1,19 @@
+rule compile
+  command = $compiler $defines $flags -MMD -MF deps.d $includes -c $in -o $out
+  description = Compiles source files into object files
+  depfile = deps.d
+  deps = gcc
+
+rule archive
+  command = $archiver cr $out $in
+  description = Combine object files into an archive
+
+rule exe
+  command = $compiler $defines $flags $includes $in -o $exe_name $linker_args
+  description = Builds an executable.
+
+rule shared
+  command = $compiler $defines -shared -fvisibility=hidden -fPIC $flags $
+      $includes $in -o $out $linker_args
+  description = Builds a shared library.
+

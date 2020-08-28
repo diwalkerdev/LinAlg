@@ -1,0 +1,28 @@
+include $
+    /Users/davidwalker/Projects/ShapeAttack/builds/osx-clang++-debug/rules.ninja
+
+build $
+    /Users/davidwalker/Projects/ShapeAttack/builds/osx-clang++-debug/shapeAttack/main.o: $
+    compile /Users/davidwalker/Projects/ShapeAttack/src/main.cpp
+  compiler = clang++
+  includes = -I/usr/local/Cellar/sdl2/2.0.12_1/include/SDL2 $
+      -I/Users/davidwalker/Projects/ShapeAttack/include $
+      -I/Users/davidwalker/Projects/ShapeAttack/lib/LinAlg/include
+  flags = -std=c++2a -O1 -g -fsanitize=address -fno-omit-frame-pointer $
+      -fsanitize=undefined
+  defines = 
+
+build ShapeAttack.exe: exe $
+    /Users/davidwalker/Projects/ShapeAttack/builds/osx-clang++-debug/shapeAttack/main.o
+  compiler = clang++
+  includes = -I/usr/local/Cellar/sdl2/2.0.12_1/include/SDL2 $
+      -I/Users/davidwalker/Projects/ShapeAttack/include $
+      -I/Users/davidwalker/Projects/ShapeAttack/lib/LinAlg/include
+  flags = -std=c++2a -O1 -g -fsanitize=address -fno-omit-frame-pointer $
+      -fsanitize=undefined
+  defines = 
+  exe_name = ShapeAttack.exe
+  linker_args = -rpath '@executable_path' -lSDL2
+
+build shapeAttack: phony ShapeAttack.exe
+

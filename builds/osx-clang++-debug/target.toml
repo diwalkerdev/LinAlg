@@ -1,0 +1,43 @@
+projectRoot = "../.."
+
+cxx = "clang++"
+cc = "clang"
+ar = "ar"
+compilerFrontend="osx"
+
+flags = [
+    "-std=c++2a",
+    "-O1",
+    "-g",
+    "-fsanitize=address",
+    "-fno-omit-frame-pointer", # get nicer stack traces from address sanitizer.
+    "-fsanitize=undefined"
+]
+
+defines = []
+
+
+[[builds]]
+    name = "linalgTransformations"
+    buildRule = "exe"
+    outputName = "LinAlgTransformations"
+    srcDirs = ["examples"]
+    includePaths = [
+        "/usr/local/include/SDL2",
+        "include",
+    ]
+    libraries = ["SDL2"]
+
+
+#[[builds]]
+#    name = "test"
+#    buildRule = "exe"
+#    outputName = "Tests"
+#    srcDirs = ["test"]
+#    includePaths = [
+#        "/usr/local/include/SDL2",
+#        "include",
+#        "lib/Meliorate/include",
+#        "lib/LinAlg/include"
+#    ]
+#    libraries = ["SDL2"]
