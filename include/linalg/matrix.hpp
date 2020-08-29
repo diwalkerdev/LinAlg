@@ -31,35 +31,26 @@ struct Matrix {
 
     value_type _elems[Rows * Cols];
 
-    inline value_type*       data() noexcept { return _elems; }
-    inline value_type const* data() const noexcept { return _elems; }
-
-    // iterators:
-    inline constexpr iterator       begin() noexcept { return iterator(data()); }
-    inline constexpr const_iterator begin() const noexcept { return const_iterator(data()); }
-    inline constexpr iterator       end() noexcept { return iterator(data() + size()); }
-    inline constexpr const_iterator end() const noexcept { return const_iterator(data() + size()); }
-
     Matrix()                                            = default;
     Matrix(Matrix<value_type, Rows, Cols> const& other) = default;
     Matrix(Matrix<value_type, Rows, Cols>&& other)      = default;
     Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols> const& other) = default;
     Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols>&& other) = default;
 
-    Matrix(Tp value)
+    Matrix(value_type value)
     {
-        std::fill(begin(), end(), value);
+        std::fill(&_elems[0], &_elems[Rows * Cols], value);
     }
 
     template <size_type N>
-    Matrix(Tp const (&initializer)[N])
+    Matrix(value_type const (&initializer)[N])
     {
         static_assert((N == cols() && rows() == 1) || (N == rows() && cols() == 1));
-        std::copy_n(&initializer[0], size(), begin());
+        std::copy_n(&initializer[0], size(), &_elems[0]);
     }
 
     template <size_t M, size_t N>
-    Matrix(Tp const (&initializer)[M][N])
+    Matrix(value_type const (&initializer)[M][N])
     {
         // If we have are getting passed a 1d init list, then make sure our matrix is a vector.
         if constexpr (M == 1)
@@ -72,30 +63,33 @@ struct Matrix {
             static_assert(N == cols());
         }
 
-        std::copy_n(&initializer[0][0], size(), begin());
+        std::copy_n(&initializer[0][0], size(), &_elems[0]);
     }
 
-    // static
-    // Matrix<value_type, Rows, Cols> zero()
-    // {
-    //     Matrix<value_type, Rows, Cols> m;
-    //     ::zero(m);
-    //     return m;
-    // }
+    static Matrix<value_type, rows(), cols()> I()
+    {
+        Matrix<value_type, rows(), cols()> result{0};
 
-    // static
-    // Matrix<value_type, Rows, Cols> I()
-    // {
-    //     static_assert(Rows == Cols, "Matrix is not square");
+        for (auto i : irange<rows()>())
+        {
+            result[i][i] = 1;
+        }
 
-    //     Matrix<value_type, Rows, Cols> m;
-    //     ::zero(m);
-    //     for (int i=0; i < Rows; ++i) {
-    //         m[i][i] = 1;
-    //     }
+        return result;
+    }
 
-    //     return m;
-    // }
+    auto T() -> Matrix<value_type, cols(), rows()>
+    {
+        Matrix<value_type, cols(), rows()> result;
+        for (auto i : irange<rows()>())
+        {
+            for (auto k : irange<cols()>())
+            {
+                result[k][i] = (*this)[i][k];
+            }
+        }
+        return result;
+    }
 
     auto operator[](size_t index)
     {
@@ -117,37 +111,6 @@ struct Matrix {
             return std::span<value_type, Cols>{&_elems[index * Cols], Cols};
         }
     }
-
-    // Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols> other)
-    // {
-    //     std::cout << "matrix matrix assign" << std::endl;
-    //     this->_elems = std::make_shared<array2d>();
-
-    //     for (size_t i = 0; i < Rows; ++i)
-    //     {
-    //         for (size_t j = 0; j < Cols; ++j)
-    //         {
-    //             (*_elems)[i][j] = (*other._elems)[i][j];
-    //         }
-    //     }
-    //     return *this;
-    // }
-
-    // Matrix<value_type, Rows, Cols>& operator=(const std::array<value_type, Rows*Cols>
-    // &other)
-    // {
-    //     std::cout << "matrix array assign" << std::endl;
-    //     this->_elems = std::make_shared<array2d>();
-
-    //     for (size_t i = 0; i < Rows; ++i)
-    //     {
-    //         for (size_t j = 0; j < Cols; ++j)
-    //         {
-    //             (*_elems)[i][j] = other[i*Cols + j];
-    //         }
-    //     }
-    //     return (*this);
-    // }
 };
 
 // template <class _Tp, class... _Args, class = std::enable_if<std::all<std::is_same<_Tp, _Args>::value...>::value>>
@@ -199,6 +162,8 @@ auto _idx(MatRef&& mat, size_t r, size_t c)
     return mat._elems[(r * mat.cols()) + c];
 }
 
+//////////////////////////////////////////////////////////////////////////////
+
 /*
 Explanation of template madness.
 
@@ -208,25 +173,22 @@ This means the type passed in could be a reference (i.e T&). You can't use :: on
 Because operator* is templated, scalars also match, which we don't want (use SFINAE).
 Remove scalars by enable_if_t. disjunction and is floating point is used to check both parameters are not floats.
 */
+
 template <typename MLeftRef,
           typename MRightRef,
-          typename MLeft  = std::remove_reference_t<MLeftRef>,
-          typename MRight = std::remove_reference_t<MRightRef>>
+          typename MLeft        = std::remove_reference_t<MLeftRef>,
+          typename MRight       = std::remove_reference_t<MRightRef>,
+          typename return_value = decltype(
+              typename MLeft::value_type{} * typename MRight::value_type{}),
+          typename return_type = Matrix<return_value, MLeft::rows(), MRight::cols()>>
 auto operator*(MLeftRef&& A, MRightRef&& B)
     -> std::enable_if_t<
-        std::conjunction_v<is_matrix<MLeft>,
-                           is_matrix<MRight>>,
-        Matrix<decltype(_idx(A, 0, 0) * _idx(B, 0, 0)),
-               MLeft::rows(),
-               MRight::cols()>>
+        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>,
+        return_type>
 {
-    static_assert(MLeft::cols() == MRight::rows(),
-                  "Invalid matrix dimensions.");
+    static_assert(MLeft::cols() == MRight::rows(), "Invalid matrix dimensions.");
 
-    Matrix<decltype(_idx(A, 0, 0) * _idx(B, 0, 0)),
-           MLeft::rows(),
-           MRight::cols()>
-        result{0};
+    return_type result{0};
 
     size_t i, j, k;
 
@@ -246,15 +208,19 @@ auto operator*(MLeftRef&& A, MRightRef&& B)
 
 
 template <typename MLeftRef,
-          typename MLeft = std::remove_reference_t<MLeftRef>>
-auto operator*(MLeftRef&& A, typename MLeft::value_type B)
-    -> std::enable_if_t<is_matrix<MLeft>::value, MLeft>
+          //typename T, // TODO: std::floating_point.
+          typename MLeft = std::remove_reference_t<MLeftRef>,
+          /*typename return_value = decltype(
+              typename MLeft::value_type{} * T{}),*/
+          typename return_type = MLeft>
+auto operator*(MLeftRef&& A, float b)
+    -> std::enable_if_t<is_matrix_v<MLeft>, MLeft>
 {
-    MLeft result(A);
+    return_type result(A);
 
     for (auto& el : result._elems)
     {
-        el *= B;
+        el *= b;
     }
 
     return result;
@@ -262,18 +228,20 @@ auto operator*(MLeftRef&& A, typename MLeft::value_type B)
 
 
 template <typename MRightRef,
+          //typename T, // TODO: std::floating_point.
           typename MRight = std::remove_reference_t<MRightRef>>
-auto operator*(typename MRight::value_type B, MRightRef&& A)
-    -> std::enable_if_t<is_matrix<MRight>::value, MRight>
+auto operator*(float b, MRightRef&& A)
+    -> std::enable_if_t<is_matrix_v<MRight>, MRight>
 {
-    return A * B;
+    return A * b;
 }
 
 
 template <typename MLeftRef,
+          //typename T, // TODO: std::floating_point.
           typename MLeft = std::remove_reference_t<MLeftRef>>
-auto operator*=(MLeftRef&& A, typename MLeft::value_type B)
-    -> std::enable_if_t<is_matrix<MLeft>::value, MLeft>
+auto operator*=(MLeftRef&& A, float B)
+    -> std::enable_if_t<is_matrix_v<MLeft>, MLeft>
 {
     for (auto& el : A._elems)
     {
@@ -286,21 +254,20 @@ auto operator*=(MLeftRef&& A, typename MLeft::value_type B)
 
 template <typename MLeftRef,
           typename MRightRef,
-          typename MLeft  = std::remove_reference_t<MLeftRef>,
-          typename MRight = std::remove_reference_t<MRightRef>>
+          typename MLeft        = std::remove_reference_t<MLeftRef>,
+          typename MRight       = std::remove_reference_t<MRightRef>,
+          typename return_value = decltype(
+              typename MLeft::value_type{} + typename MRight::value_type{}),
+          typename return_type = Matrix<return_value, MLeft::rows(), MLeft::cols()>>
 auto operator+(MLeftRef&& A, MRightRef&& B)
     -> std::enable_if_t<
         std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>,
-        Matrix<decltype(_idx(A, 0, 0) + _idx(B, 0, 0)),
-               MLeft::rows(),
-               MRight::cols()>>
+        return_type>
 {
-    static_assert(MLeft::cols() == MRight::cols(),
-                  "Invalid matrix dimensions.");
-    static_assert(MLeft::rows() == MRight::rows(),
-                  "Invalid matrix dimensions.");
+    static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
+    static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
 
-    Matrix<decltype(_idx(A, 0, 0) + _idx(B, 0, 0)), MLeft::rows(), MRight::cols()> result;
+    return_type result;
 
     size_t i, j;
 
@@ -318,8 +285,8 @@ auto operator+(MLeftRef&& A, MRightRef&& B)
 
 template <typename MLeftRef,
           typename MLeft = std::remove_reference_t<MLeftRef>>
-auto operator+(MLeftRef&& A, typename MLeft::value_type B)
-    -> std::enable_if_t<is_matrix<MLeft>::value, MLeft>
+auto operator+(MLeftRef&& A, float B)
+    -> std::enable_if_t<is_matrix_v<MLeft>, MLeft>
 {
     auto result(A);
 
@@ -334,7 +301,7 @@ auto operator+(MLeftRef&& A, typename MLeft::value_type B)
 
 template <typename MRightRef,
           typename MRight = std::remove_reference_t<MRightRef>>
-auto operator+(typename MRight::value_type B, MRightRef&& A)
+auto operator+(float B, MRightRef&& A)
     -> std::enable_if_t<is_matrix<MRight>::value, MRight>
 {
     return A + B;
@@ -342,7 +309,7 @@ auto operator+(typename MRight::value_type B, MRightRef&& A)
 
 template <typename MLeftRef,
           typename MLeft = std::remove_reference_t<MLeftRef>>
-auto operator+=(MLeftRef&& A, typename MLeft::value_type B)
+auto operator+=(MLeftRef&& A, float B)
     -> std::enable_if_t<is_matrix<MLeft>::value, MLeft>
 {
     for (auto& el : A._elems)
@@ -355,25 +322,31 @@ auto operator+=(MLeftRef&& A, typename MLeft::value_type B)
 
 //////////////////////////////////////////////////////////////////////////////
 
-template <typename MAT, size_t N>
-auto cols(MAT& mat, int const (&values)[N]) -> linalg::Matrix<typename MAT::value_type, MAT::rows(), N>
+template <typename MLeft,
+          size_t N,
+          typename return_value = typename MLeft::value_type,
+          typename return_type  = linalg::Matrix<return_value, MLeft::rows(), N>>
+auto cols(MLeft&& mat, int const (&values)[N])
+    -> std::enable_if_t<is_matrix_v<MLeft>, return_type>
 {
-    linalg::Matrix<typename MAT::value_type, MAT::rows(), N> other;
+    return_type result;
 
     int dst = 0;
     for (auto src : values)
     {
-        assert(src < MAT::cols());
+        assert(src < MLeft::cols());
 
-        for (int r : irange<MAT::rows()>())
+        for (int r : irange<MLeft::rows()>())
         {
-            other[r][dst] = mat[r][src];
+            result[r][dst] = mat[r][src];
         }
         ++dst;
     }
 
-    return other;
+    return result;
 }
+
+//////////////////////////////////////////////////////////////////////////////
 
 template <size_t Rows, size_t Cols>
 using Matrixf = Matrix<float, Rows, Cols>;
@@ -391,15 +364,21 @@ using Vectorf = Matrix<float, Rows, 1>;
 template <size_t Rows>
 using Vectord = Matrix<double, Rows, 1>;
 
+//////////////////////////////////////////////////////////////////////////////
+
 } // end namespace linalg
 
 //////////////////////////////////////////////////////////////////////////////
 
-template <typename M>
-auto iter(M& mat) -> std::array<std::span<typename M::value_type>, M::rows()>
+template <typename MLeftRef,
+          typename MLeft        = std::remove_reference_t<MLeftRef>,
+          typename return_value = std::span<typename MLeft::value_type>,
+          typename return_type  = std::array<return_value, MLeft::rows()>>
+auto iter(MLeftRef&& mat)
+    -> std::enable_if_t<linalg::is_matrix_v<MLeft>, return_type>
 {
-    std::array<std::span<typename M::value_type>, M::rows()> v;
-    for (auto i : irange<M::rows()>())
+    return_type v;
+    for (auto i : irange<MLeft::rows()>())
     {
         v[i] = mat[i];
     }
@@ -408,9 +387,11 @@ auto iter(M& mat) -> std::array<std::span<typename M::value_type>, M::rows()>
 
 //////////////////////////////////////////////////////////////////////////////
 
-template <typename value_type, size_t Rows, size_t Cols>
-std::ostream& operator<<(std::ostream&                           os,
-                         linalg::Matrix<value_type, Rows, Cols>& A)
+template <typename MRightRef,
+          typename MRight      = std::remove_reference_t<MRightRef>,
+          typename return_type = std::ostream&>
+auto operator<<(std::ostream& os, MRightRef&& A)
+    -> std::enable_if_t<linalg::is_matrix_v<MRight>, return_type>
 {
     for (auto const& row : iter(A))
     {
