@@ -45,17 +45,21 @@ struct Matrix {
     Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols> const& other) = default;
     Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols>&& other) = default;
 
+    auto _first() -> iterator { return &_elems[0]; }
+    auto _first() const -> const_iterator { return &_elems[0]; }
+    auto _last() -> iterator { return &_elems[size()]; }
+    auto _last() const -> const_iterator { return &_elems[size()]; }
 
     Matrix(value_type value)
     {
-        std::fill(&_elems[0], &_elems[Rows * Cols], value);
+        std::fill(_first(), _last(), value);
     }
 
     template <size_type N>
     Matrix(value_type const (&initializer)[N])
     {
         static_assert((N == cols() && rows() == 1) || (N == rows() && cols() == 1));
-        std::copy_n(&initializer[0], size(), &_elems[0]);
+        std::copy_n(&initializer[0], size(), _first());
     }
 
     // template <size_t Rows, size_t Cols>
@@ -72,7 +76,7 @@ struct Matrix {
             static_assert(Cols == cols());
         }
 
-        std::copy_n(&initializer[0][0], size(), &_elems[0]);
+        std::copy_n(&initializer[0][0], size(), _first());
     }
 
     static Matrix<value_type, rows(), cols()> I()
@@ -142,10 +146,6 @@ struct Matrix {
         }
     }
 };
-
-// template <class _Tp, class... _Args, class = std::enable_if<std::all<std::is_same<_Tp, _Args>::value...>::value>>
-// array(_Tp, _Args...)
-//     -> array<_Tp, 1 + sizeof...(_Args)>;
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -353,6 +353,30 @@ auto operator+=(MLeftRef&& A, float B)
     return A;
 }
 
+
+template <typename MLeftRef,
+          typename MRightRef,
+          typename MLeft  = std::remove_reference_t<MLeftRef>,
+          typename MRight = std::remove_reference_t<MRightRef>>
+auto operator+=(MLeftRef&& A, MRightRef&& B)
+    -> std::enable_if_t<
+        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>>
+{
+    static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
+    static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
+
+    size_t i, j;
+
+    for (i = 0; i < MLeft::rows(); ++i)
+    {
+        for (j = 0; j < MRight::cols(); ++j)
+        {
+            _idx(A, i, j) += _idx(B, i, j);
+        }
+    }
+}
+
+
 //////////////////////////////////////////////////////////////////////////////
 // equality functions
 //
@@ -365,9 +389,9 @@ auto operator==(MLeftRef&& A, MRightRef&& B) -> bool
     static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
     static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
 
-    return std::equal(&A._elems[0],
-                      &A._elems[MLeft::rows() * MLeft::cols()],
-                      &B._elems[0],
+    return std::equal(A._first(),
+                      A._last(),
+                      B._first(),
                       [](float x, float y) -> bool {
                           return approximately_equal(x, y);
                       });
