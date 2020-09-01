@@ -14,6 +14,14 @@
 
 namespace linalg {
 
+// TODO: Use a more rebust method for determining if two floats are similar.
+inline float epsilon = 0.000001;
+
+float approximately_equal(float a, float b)
+{
+    return std::abs(a - b) < epsilon;
+}
+
 // TODO: Use floating_point concept again when osx updates.
 // template <std::floating_point Tp, std::size_t Rows, std::size_t Cols>
 template <typename Tp, std::size_t Rows, std::size_t Cols>
@@ -37,6 +45,7 @@ struct Matrix {
     Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols> const& other) = default;
     Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols>&& other) = default;
 
+
     Matrix(value_type value)
     {
         std::fill(&_elems[0], &_elems[Rows * Cols], value);
@@ -49,18 +58,18 @@ struct Matrix {
         std::copy_n(&initializer[0], size(), &_elems[0]);
     }
 
-    template <size_t M, size_t N>
-    Matrix(value_type const (&initializer)[M][N])
+    // template <size_t Rows, size_t Cols>
+    Matrix(value_type const (&initializer)[Rows][Cols])
     {
         // If we have are getting passed a 1d init list, then make sure our matrix is a vector.
-        if constexpr (M == 1)
+        if constexpr (Rows == 1)
         {
-            static_assert((N == cols() && rows() == 1) || (N == rows() && cols() == 1));
+            static_assert((Cols == cols() && rows() == 1) || (Cols == rows() && cols() == 1));
         }
         else
         {
-            static_assert(M == rows());
-            static_assert(N == cols());
+            static_assert(Rows == rows());
+            static_assert(Cols == cols());
         }
 
         std::copy_n(&initializer[0][0], size(), &_elems[0]);
@@ -109,6 +118,27 @@ struct Matrix {
         {
             assert(index < Rows);
             return std::span<value_type, Cols>{&_elems[index * Cols], Cols};
+        }
+    }
+
+    auto operator[](size_t index) const
+    {
+        assert(index >= 0);
+
+        if constexpr (Cols == 1)
+        {
+            assert(index < Rows);
+            return _elems[index];
+        }
+        else if constexpr (Rows == 1)
+        {
+            assert(index < Cols);
+            return _elems[index];
+        }
+        else
+        {
+            assert(index < Rows);
+            return std::span<const value_type, Cols>{&_elems[index * Cols], Cols};
         }
     }
 };
@@ -251,6 +281,9 @@ auto operator*=(MLeftRef&& A, float B)
     return A;
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// Additive functions
+//
 
 template <typename MLeftRef,
           typename MRightRef,
@@ -321,6 +354,40 @@ auto operator+=(MLeftRef&& A, float B)
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// equality functions
+//
+template <typename MLeftRef,
+          typename MRightRef,
+          typename MLeft  = std::remove_reference_t<MLeftRef>,
+          typename MRight = std::remove_reference_t<MRightRef>>
+auto operator==(MLeftRef&& A, MRightRef&& B) -> bool
+{
+    static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
+    static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
+
+    return std::equal(&A._elems[0],
+                      &A._elems[MLeft::rows() * MLeft::cols()],
+                      &B._elems[0],
+                      [](float x, float y) -> bool {
+                          return approximately_equal(x, y);
+                      });
+}
+
+template <typename MLeftRef,
+          typename MRightRef,
+          typename MLeft  = std::remove_reference_t<MLeftRef>,
+          typename MRight = std::remove_reference_t<MRightRef>>
+auto operator!=(MLeftRef&& A, MRightRef&& B) -> bool
+{
+    static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
+    static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
+
+    return !(A == B);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Misc functions
+//
 
 template <typename MLeft,
           size_t N,
@@ -369,6 +436,22 @@ using Vectord = Matrix<double, Rows, 1>;
 } // end namespace linalg
 
 //////////////////////////////////////////////////////////////////////////////
+
+template <typename MLeftRef,
+          typename MLeft        = std::remove_reference_t<MLeftRef>,
+          typename return_value = std::span<const typename MLeft::value_type>,
+          typename return_type  = std::array<return_value, MLeft::rows()>>
+auto iter(MLeftRef const& mat)
+    -> std::enable_if_t<linalg::is_matrix_v<MLeft>, return_type>
+{
+    return_type v;
+    for (auto i : irange<MLeft::rows()>())
+    {
+        v[i] = mat[i];
+    }
+    return v;
+}
+
 
 template <typename MLeftRef,
           typename MLeft        = std::remove_reference_t<MLeftRef>,
