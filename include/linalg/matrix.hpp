@@ -79,7 +79,7 @@ struct Matrix {
         std::copy_n(&initializer[0][0], size(), _first());
     }
 
-    static Matrix<value_type, rows(), cols()> I()
+    static auto I() -> Matrix<value_type, rows(), cols()>
     {
         Matrix<value_type, rows(), cols()> result{0};
 
@@ -173,21 +173,12 @@ inline constexpr bool is_matrix_v = is_matrix<T>::value;
 // i.e. vectors are matrices where one of the dimensions is 1.
 
 template <typename MatRef,
-          typename Mat = std::remove_reference_t<MatRef>>
-auto _idx(MatRef const& mat, size_t r, size_t c)
-    -> std::enable_if_t<
-        is_matrix<Mat>::value,
-        typename Mat::value_type>
-{
-    return mat._elems[(r * mat.cols()) + c];
-}
-
-template <typename MatRef,
-          typename Mat = std::remove_reference_t<MatRef>>
+          typename Mat         = std::remove_reference_t<MatRef>,
+          typename return_type = std::conditional_t<std::is_const_v<Mat>,
+                                                    typename Mat::value_type,
+                                                    typename Mat::reference>>
 auto _idx(MatRef&& mat, size_t r, size_t c)
-    -> std::enable_if_t<
-        is_matrix<Mat>::value,
-        typename Mat::reference>
+    -> std::enable_if_t<is_matrix_v<Mat>, return_type>
 {
     return mat._elems[(r * mat.cols()) + c];
 }
