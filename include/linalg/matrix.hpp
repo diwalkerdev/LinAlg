@@ -45,6 +45,11 @@ struct Matrix {
     Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols> const& other) = default;
     Matrix<value_type, Rows, Cols>& operator=(Matrix<value_type, Rows, Cols>&& other) = default;
 
+    Matrix(std::span<value_type, Rows> const& view)
+    {
+        std::copy(view.begin(), view.end(), _first());
+    }
+
     auto _first() -> iterator { return &_elems[0]; }
     auto _first() const -> const_iterator { return &_elems[0]; }
     auto _last() -> iterator { return &_elems[size()]; }
@@ -145,6 +150,22 @@ struct Matrix {
             return std::span<const value_type, Cols>{&_elems[index * Cols], Cols};
         }
     }
+
+    template <std::size_t START, std::size_t ELEMS>
+    auto row_view(size_t index)
+    {
+        static_assert(START + ELEMS < cols(), "row view out of bounds");
+        auto row = (*this)[index];
+        return std::span<value_type, ELEMS>{&row[START], ELEMS};
+    }
+
+    template <std::size_t START, std::size_t ELEMS>
+    auto row_view(size_t index) const
+    {
+        static_assert(START + ELEMS < cols(), "row view out of bounds");
+        auto row = (*this)[index];
+        return std::span<value_type, ELEMS>{&row[START], ELEMS};
+    }
 };
 
 //////////////////////////////////////////////////////////////////////////////
@@ -168,6 +189,32 @@ inline constexpr bool is_matrix_v = is_matrix<T>::value;
 
 //////////////////////////////////////////////////////////////////////////////
 
+template <typename Tp>
+struct is_colvec : std::false_type {
+};
+
+template <typename Tp, std::size_t M, std::size_t N>
+struct is_colvec<Matrix<Tp, M, N>> {
+    static constexpr bool value = (N == 1);
+};
+
+template <typename T>
+inline constexpr bool is_colvec_v = is_colvec<T>::value;
+
+template <typename Tp>
+struct is_rowvec : std::false_type {
+};
+
+template <typename Tp, std::size_t M, std::size_t N>
+struct is_rowvec<Matrix<Tp, M, N>> {
+    static constexpr bool value = (M == 1);
+};
+
+template <typename T>
+inline constexpr bool is_rowvec_v = is_rowvec<T>::value;
+
+//////////////////////////////////////////////////////////////////////////////
+
 // _idx avoids the use of Matrix::operator[].
 // This  allows vectors and matrices to use the same code:
 // i.e. vectors are matrices where one of the dimensions is 1.
@@ -175,7 +222,7 @@ inline constexpr bool is_matrix_v = is_matrix<T>::value;
 template <typename MatRef,
           typename Mat         = std::remove_reference_t<MatRef>,
           typename return_type = std::conditional_t<std::is_const_v<Mat>,
-                                                    typename Mat::value_type,
+                                                    const typename Mat::value_type,
                                                     typename Mat::reference>>
 auto _idx(MatRef&& mat, size_t r, size_t c)
     -> std::enable_if_t<is_matrix_v<Mat>, return_type>
@@ -452,36 +499,63 @@ using Vectord = Matrix<double, Rows, 1>;
 
 //////////////////////////////////////////////////////////////////////////////
 
-template <typename MLeftRef,
-          typename MLeft        = std::remove_reference_t<MLeftRef>,
-          typename return_value = std::span<const typename MLeft::value_type>,
-          typename return_type  = std::array<return_value, MLeft::rows()>>
-auto iter(MLeftRef const& mat)
-    -> std::enable_if_t<linalg::is_matrix_v<MLeft>, return_type>
+template <typename T>
+inline constexpr auto primary_dimension()
+    -> std::enable_if_t<linalg::is_matrix_v<T>, std::size_t>
 {
-    return_type v;
-    for (auto i : irange<MLeft::rows()>())
+    if constexpr (linalg::is_colvec_v<std::remove_const_t<T>>)
     {
-        v[i] = mat[i];
+        return T::rows();
     }
-    return v;
+    else
+    {
+        return T::cols();
+    }
 }
 
 
+template <typename T>
+inline constexpr auto number_iterations()
+    -> std::enable_if_t<linalg::is_matrix_v<T>, std::size_t>
+{
+    if constexpr (linalg::is_colvec_v<std::remove_const_t<T>> || linalg::is_rowvec_v<std::remove_const_t<T>>)
+    {
+        return 1;
+    }
+    else
+    {
+        return T::rows();
+    }
+}
+
 template <typename MLeftRef,
           typename MLeft        = std::remove_reference_t<MLeftRef>,
-          typename return_value = std::span<typename MLeft::value_type>,
-          typename return_type  = std::array<return_value, MLeft::rows()>>
+          size_t dimensions     = primary_dimension<MLeft>(),
+          size_t iterations     = number_iterations<MLeft>(),
+          typename return_value = std::conditional_t<std::is_const_v<MLeft>,
+                                                     const typename MLeft::value_type,
+                                                     typename MLeft::value_type>,
+          typename return_type  = std::vector<std::span<return_value, dimensions>>>
 auto iter(MLeftRef&& mat)
     -> std::enable_if_t<linalg::is_matrix_v<MLeft>, return_type>
 {
-    return_type v;
-    for (auto i : irange<MLeft::rows()>())
+    if constexpr (linalg::is_colvec_v<std::remove_const_t<MLeft>> || linalg::is_rowvec_v<std::remove_const_t<MLeft>>)
     {
-        v[i] = mat[i];
+        return_type result;
+        result.emplace_back(mat._first(), dimensions);
+        return result;
     }
-    return v;
+    else
+    {
+        return_type result;
+        for (auto i : irange<MLeft::rows()>())
+        {
+            result.push_back(mat[i]);
+        }
+        return result;
+    }
 }
+
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -501,6 +575,16 @@ auto operator<<(std::ostream& os, MRightRef&& A)
     }
 
     return os;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+template <typename Tp, std::size_t M, std::size_t N>
+constexpr auto copy_from(std::span<Tp, M>&& row, linalg::Vectorf<N> const& vec) noexcept -> std::span<Tp, M>&
+{
+    static_assert(M == N, "Dimensions do not match.");
+    std::copy(vec._first(), vec._last(), row.begin());
+    return row;
 }
 
 //////////////////////////////////////////////////////////////////////////////

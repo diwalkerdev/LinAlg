@@ -2,32 +2,31 @@
 #define LINALG_MISC_HPP
 
 #include <array>
-#include <numeric>
-#include <span>
-#include <vector>
 
 //////////////////////////////////////////////////////////////////////////////
-
 // It is intented that this function should eventually be replaced with iota_view.
 // This function is really bad from a performance perspective because you have to
 // allocate Nxint amount of memory to perform an iteration.
-template <size_t StartValue, size_t EndValue>
-std::vector<size_t> irange()
+
+template <size_t StartValue, size_t EndValue, size_t Size = EndValue - StartValue>
+std::array<int, Size> irange()
 {
-    static_assert(EndValue > StartValue);
+    static_assert(Size > 0);
 
-    constexpr size_t size = EndValue - StartValue;
+    std::array<int, Size> indices;
 
-    std::vector<size_t> v(size);
-    std::iota(v.begin(), v.end(), StartValue);
-    return v;
+    for (int i = 0; i < Size; ++i)
+    {
+        indices[i] = StartValue + i;
+    }
+    return indices;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 
 // It is intented that this function should eventually be replaced with iota_view.
 template <size_t EndValue>
-std::vector<size_t> irange()
+std::array<int, EndValue> irange()
 {
     return irange<0, EndValue>();
 }
@@ -35,13 +34,15 @@ std::vector<size_t> irange()
 //////////////////////////////////////////////////////////////////////////////
 
 // Performs a deep copy of "values" into the span.
-template <typename Span>
-void span_deepcopy(Span row, std::array<typename Span::value_type, Span::extent> values)
-{
-    static_assert(Span::extent != std::dynamic_extent);
+// TODO: Rename to copy_from
+// template <typename Span>
+// void span_deepcopy(Span row, std::array<typename Span::value_type, Span::extent> values)
+// {
+//     static_assert(Span::extent != std::dynamic_extent);
 
-    std::copy(values.begin(), values.end(), row.begin());
-}
+//     std::copy(values.begin(), values.end(), row.begin());
+// }
+
 
 //////////////////////////////////////////////////////////////////////////////
 
