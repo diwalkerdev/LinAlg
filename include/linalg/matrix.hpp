@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <concepts>
 #include <iostream>
 #include <numeric>
 #include <span>
@@ -17,14 +18,13 @@ namespace linalg {
 // TODO: Use a more rebust method for determining if two floats are similar.
 inline float epsilon = 0.000001;
 
-float approximately_equal(float a, float b)
+template <std::floating_point T, std::floating_point P>
+auto approximately_equal(T a, P b) -> bool
 {
     return std::abs(a - b) < epsilon;
 }
 
-// TODO: Use floating_point concept again when osx updates.
-// template <std::floating_point Tp, std::size_t Rows, std::size_t Cols>
-template <typename Tp, std::size_t Rows, std::size_t Cols>
+template <std::floating_point Tp, std::size_t Rows, std::size_t Cols>
 struct Matrix {
     static constexpr auto size() noexcept { return Rows * Cols; }
     static constexpr auto rows() noexcept { return Rows; }
@@ -276,12 +276,10 @@ auto operator*(MLeftRef&& A, MRightRef&& B)
 
 
 template <typename MLeftRef,
-          //typename T, // TODO: std::floating_point.
-          typename MLeft = std::remove_reference_t<MLeftRef>,
-          /*typename return_value = decltype(
-              typename MLeft::value_type{} * T{}),*/
+          std::floating_point Tp,
+          typename MLeft       = std::remove_reference_t<MLeftRef>,
           typename return_type = MLeft>
-auto operator*(MLeftRef&& A, float b)
+auto operator*(MLeftRef&& A, Tp b)
     -> std::enable_if_t<is_matrix_v<MLeft>, MLeft>
 {
     return_type result(A);
@@ -295,10 +293,10 @@ auto operator*(MLeftRef&& A, float b)
 }
 
 
-template <typename MRightRef,
-          //typename T, // TODO: std::floating_point.
+template <std::floating_point Tp,
+          typename MRightRef,
           typename MRight = std::remove_reference_t<MRightRef>>
-auto operator*(float b, MRightRef&& A)
+auto operator*(Tp b, MRightRef&& A)
     -> std::enable_if_t<is_matrix_v<MRight>, MRight>
 {
     return A * b;
@@ -306,9 +304,9 @@ auto operator*(float b, MRightRef&& A)
 
 
 template <typename MLeftRef,
-          //typename T, // TODO: std::floating_point.
+          std::floating_point Tp,
           typename MLeft = std::remove_reference_t<MLeftRef>>
-auto operator*=(MLeftRef&& A, float B)
+auto operator*=(MLeftRef&& A, Tp B)
     -> std::enable_if_t<is_matrix_v<MLeft>, MLeft>
 {
     for (auto& el : A._elems)
@@ -355,8 +353,9 @@ auto operator+(MLeftRef&& A, MRightRef&& B)
 
 
 template <typename MLeftRef,
+          std::floating_point Tp,
           typename MLeft = std::remove_reference_t<MLeftRef>>
-auto operator+(MLeftRef&& A, float B)
+auto operator+(MLeftRef&& A, Tp B)
     -> std::enable_if_t<is_matrix_v<MLeft>, MLeft>
 {
     auto result(A);
@@ -370,18 +369,20 @@ auto operator+(MLeftRef&& A, float B)
 }
 
 
-template <typename MRightRef,
+template <std::floating_point Tp,
+          typename MRightRef,
           typename MRight = std::remove_reference_t<MRightRef>>
-auto operator+(float B, MRightRef&& A)
+auto operator+(Tp B, MRightRef&& A)
     -> std::enable_if_t<is_matrix<MRight>::value, MRight>
 {
     return A + B;
 }
 
 template <typename MLeftRef,
+          std::floating_point Tp,
           typename MLeft = std::remove_reference_t<MLeftRef>>
-auto operator+=(MLeftRef&& A, float B)
-    -> std::enable_if_t<is_matrix<MLeft>::value, MLeft>
+auto operator+=(MLeftRef& A, Tp B)
+    -> std::enable_if_t<is_matrix_v<MLeft>, MLeft>
 {
     for (auto& el : A._elems)
     {
@@ -396,9 +397,10 @@ template <typename MLeftRef,
           typename MRightRef,
           typename MLeft  = std::remove_reference_t<MLeftRef>,
           typename MRight = std::remove_reference_t<MRightRef>>
-auto operator+=(MLeftRef&& A, MRightRef&& B)
+auto operator+=(MLeftRef& A, MRightRef&& B)
     -> std::enable_if_t<
-        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>>
+        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>,
+        MLeft&>
 {
     static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
     static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
@@ -412,6 +414,8 @@ auto operator+=(MLeftRef&& A, MRightRef&& B)
             _idx(A, i, j) += _idx(B, i, j);
         }
     }
+
+    return A;
 }
 
 
@@ -422,7 +426,10 @@ template <typename MLeftRef,
           typename MRightRef,
           typename MLeft  = std::remove_reference_t<MLeftRef>,
           typename MRight = std::remove_reference_t<MRightRef>>
-auto operator==(MLeftRef&& A, MRightRef&& B) -> bool
+auto operator==(MLeftRef&& A, MRightRef&& B)
+    -> std::enable_if_t<
+        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>,
+        bool>
 {
     static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
     static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
@@ -430,7 +437,7 @@ auto operator==(MLeftRef&& A, MRightRef&& B) -> bool
     return std::equal(A._first(),
                       A._last(),
                       B._first(),
-                      [](float x, float y) -> bool {
+                      [](typename MLeft::value_type x, typename Right::value_type y) -> bool {
                           return approximately_equal(x, y);
                       });
 }
