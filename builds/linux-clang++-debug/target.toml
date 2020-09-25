@@ -31,9 +31,9 @@ defines = []
 #    includePaths = ["include"]         # additional include paths to use during the build.
 
 [[builds]]
-    name = "shapeAttack"
+    name = "demo"
     buildRule = "exe"
-    outputName = "ShapeAttack"
+    outputName = "Demo"
     srcDirs = ["src"]
     includePaths = [
         "/usr/include/SDL2",

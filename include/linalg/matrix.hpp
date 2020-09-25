@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <concepts>
 #include <iostream>
 #include <numeric>
@@ -96,20 +97,12 @@ struct Matrix {
         return result;
     }
 
-    auto T() -> Matrix<value_type, cols(), rows()>
-    {
-        Matrix<value_type, cols(), rows()> result;
-        for (auto i : irange<rows()>())
-        {
-            for (auto k : irange<cols()>())
-            {
-                result[k][i] = (*this)[i][k];
-            }
-        }
-        return result;
-    }
 
-    auto operator[](size_t index)
+    inline constexpr static bool is_row_vector_v = cols() == 1;
+    inline constexpr static bool is_col_vector_v = rows() == 1;
+    inline constexpr static bool is_vector_v     = is_row_vector_v || is_col_vector_v;
+
+    auto operator[](size_t index) -> std::conditional_t<is_vector_v, reference, std::span<value_type, Cols>>
     {
         assert(index >= 0);
 
@@ -170,6 +163,34 @@ struct Matrix {
 
 //////////////////////////////////////////////////////////////////////////////
 
+template <size_t Rows, size_t Cols>
+using Matrixf = Matrix<float, Rows, Cols>;
+
+template <size_t Rows, size_t Cols>
+using Matrixd = Matrix<double, Rows, Cols>;
+
+
+template <typename value_type, size_t Rows>
+using Vector = Matrix<value_type, Rows, 1>;
+
+template <size_t Rows>
+using Vectorf = Matrix<float, Rows, 1>;
+
+template <size_t Rows>
+using Vectord = Matrix<double, Rows, 1>;
+
+
+template <typename value_type, size_t Rows>
+using ColVector = Matrix<value_type, 1, Rows>;
+
+template <size_t Rows>
+using ColVectorf = Matrix<float, 1, Rows>;
+
+template <size_t Rows>
+using ColVectord = Matrix<double, 1, Rows>;
+
+//////////////////////////////////////////////////////////////////////////////
+
 // Type Traits to identify matrix types
 //
 template <typename Tp>
@@ -213,6 +234,9 @@ struct is_rowvec<Matrix<Tp, M, N>> {
 template <typename T>
 inline constexpr bool is_rowvec_v = is_rowvec<T>::value;
 
+template <typename Tp>
+inline constexpr bool is_vector_v = std::disjunction_v<is_rowvec<Tp>, is_colvec<Tp>>;
+
 //////////////////////////////////////////////////////////////////////////////
 
 // _idx avoids the use of Matrix::operator[].
@@ -224,11 +248,22 @@ template <typename MatRef,
           typename return_type = std::conditional_t<std::is_const_v<Mat>,
                                                     const typename Mat::value_type,
                                                     typename Mat::reference>>
-auto _idx(MatRef&& mat, size_t r, size_t c)
+inline auto _idx(MatRef&& mat, size_t r, size_t c)
     -> std::enable_if_t<is_matrix_v<Mat>, return_type>
 {
     return mat._elems[(r * mat.cols()) + c];
 }
+
+template <typename MatRef,
+          typename Mat         = std::remove_reference_t<MatRef>,
+          typename return_type = typename Mat::reference>
+inline auto _at(MatRef&& mat, size_t pos) -> return_type
+{
+    return mat._elems[pos];
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -278,7 +313,7 @@ auto operator*(MLeftRef&& A, MRightRef&& B)
 template <typename MLeftRef,
           std::floating_point Tp,
           typename MLeft       = std::remove_reference_t<MLeftRef>,
-          typename return_type = MLeft>
+          typename return_type = std::remove_const_t<MLeft>>
 auto operator*(MLeftRef&& A, Tp b)
     -> std::enable_if_t<is_matrix_v<MLeft>, MLeft>
 {
@@ -351,6 +386,35 @@ auto operator+(MLeftRef&& A, MRightRef&& B)
     return result;
 }
 
+template <typename MLeftRef,
+          typename MRightRef,
+          typename MLeft        = std::remove_reference_t<MLeftRef>,
+          typename MRight       = std::remove_reference_t<MRightRef>,
+          typename return_value = decltype(
+              typename MLeft::value_type{} + typename MRight::value_type{}),
+          typename return_type = Matrix<return_value, MLeft::rows(), MLeft::cols()>>
+auto operator-(MLeftRef&& A, MRightRef&& B)
+    -> std::enable_if_t<
+        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>,
+        return_type>
+{
+    static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
+    static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
+
+    return_type result;
+
+    size_t i, j;
+
+    for (i = 0; i < MLeft::rows(); ++i)
+    {
+        for (j = 0; j < MRight::cols(); ++j)
+        {
+            _idx(result, i, j) = _idx(A, i, j) - _idx(B, i, j);
+        }
+    }
+
+    return result;
+}
 
 template <typename MLeftRef,
           std::floating_point Tp,
@@ -418,6 +482,24 @@ auto operator+=(MLeftRef& A, MRightRef&& B)
     return A;
 }
 
+template <std::floating_point Tp, std::size_t N>
+auto operator+=(std::span<Tp, N>& row, Vectorf<N> const& v)
+{
+    for (int i = 0; i < N; ++i)
+    {
+        row[i] += v[i];
+    }
+}
+
+template <std::floating_point Tp, std::size_t N>
+auto operator+=(std::span<Tp, N>&& row, Vectorf<N> const& v)
+{
+    for (int i = 0; i < N; ++i)
+    {
+        row[i] += v[i];
+    }
+}
+
 
 //////////////////////////////////////////////////////////////////////////////
 // equality functions
@@ -437,7 +519,7 @@ auto operator==(MLeftRef&& A, MRightRef&& B)
     return std::equal(A._first(),
                       A._last(),
                       B._first(),
-                      [](typename MLeft::value_type x, typename Right::value_type y) -> bool {
+                      [](typename MLeft::value_type x, typename MRight::value_type y) -> bool {
                           return approximately_equal(x, y);
                       });
 }
@@ -481,24 +563,6 @@ auto cols(MLeft&& mat, int const (&values)[N])
 
     return result;
 }
-
-//////////////////////////////////////////////////////////////////////////////
-
-template <size_t Rows, size_t Cols>
-using Matrixf = Matrix<float, Rows, Cols>;
-
-template <size_t Rows, size_t Cols>
-using Matrixd = Matrix<double, Rows, Cols>;
-
-
-template <typename value_type, size_t Rows>
-using Vector = Matrix<value_type, Rows, 1>;
-
-template <size_t Rows>
-using Vectorf = Matrix<float, Rows, 1>;
-
-template <size_t Rows>
-using Vectord = Matrix<double, Rows, 1>;
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -593,6 +657,65 @@ constexpr auto copy_from(std::span<Tp, M>&& row, linalg::Vectorf<N> const& vec) 
     std::copy(vec._first(), vec._last(), row.begin());
     return row;
 }
+
+template <typename Tp, std::size_t M, std::size_t N>
+constexpr auto copy_from(std::span<Tp, M> row, Tp const (&values)[N]) noexcept -> std::span<Tp, M>
+{
+    static_assert(row.extent != std::dynamic_extent);
+
+    std::copy(&values[0], &values[N], row.begin());
+    return row;
+}
+
+
+template <typename Tp, std::size_t M>
+constexpr auto copy_from(std::span<Tp, M> row, std::span<Tp, M>&& values) noexcept -> std::span<Tp, M>
+{
+    static_assert(row.extent != std::dynamic_extent);
+
+    std::copy(&values[0], &values[M], row.begin());
+    return row;
+}
+
+template <typename MatRef,
+          typename Mat = std::remove_reference_t<MatRef>>
+auto T(MatRef&& mat) -> linalg::Matrix<typename Mat::value_type, Mat::cols(), Mat::rows()>
+{
+    linalg::Matrix<typename Mat::value_type, Mat::cols(), Mat::rows()> result;
+    for (auto i : irange<Mat::rows()>())
+    {
+        for (auto k : irange<Mat::cols()>())
+        {
+            _idx(result, k, i) = _idx(mat, i, k);
+        }
+    }
+    return result;
+}
+
+template <typename Tp, std::size_t Size>
+auto magnitude(linalg::Vector<Tp, Size>& v)
+{
+    float sum = 0;
+    float mag;
+
+    for (int i = 0; i < v.size(); ++i)
+    {
+        sum += (v[i] * v[i]);
+    }
+
+    mag = std::sqrt(sum);
+    return mag;
+}
+
+template <typename Tp, std::size_t Size>
+auto norm(linalg::Vector<Tp, Size>& v)
+{
+    auto  result = v;
+    float mag    = magnitude(v);
+
+    return (result * (1.f / mag));
+}
+
 
 //////////////////////////////////////////////////////////////////////////////
 
