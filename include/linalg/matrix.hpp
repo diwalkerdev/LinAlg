@@ -56,7 +56,7 @@ struct Matrix {
     auto _last() -> iterator { return &_elems[size()]; }
     auto _last() const -> const_iterator { return &_elems[size()]; }
 
-    Matrix(value_type value)
+    explicit Matrix(value_type value)
     {
         std::fill(_first(), _last(), value);
     }
@@ -268,14 +268,14 @@ inline auto _at(MatRef&& mat, size_t pos) -> return_type
 //////////////////////////////////////////////////////////////////////////////
 
 /*
-Explanation of template madness.
-
-Operator* uses perfect forwarding so l and r value references can be passed to the function.
-This means the type passed in could be a reference (i.e T&). You can't use :: on a reference, hence remove_reference_t.
-
-Because operator* is templated, scalars also match, which we don't want (use SFINAE).
-Remove scalars by enable_if_t. disjunction and is floating point is used to check both parameters are not floats.
-*/
+        Explanation of template madness.
+        
+        Operator* uses perfect forwarding so l and r value references can be passed to the function.
+        This means the type passed in could be a reference (i.e T&). You can't use :: on a reference, hence remove_reference_t.
+        
+        Because operator* is templated, scalars also match, which we don't want (use SFINAE).
+        Remove scalars by enable_if_t. disjunction and is floating point is used to check both parameters are not floats.
+        */
 
 template <typename MLeftRef,
           typename MRightRef,
@@ -350,6 +350,17 @@ auto operator*=(MLeftRef&& A, Tp B)
     }
 
     return A;
+}
+
+template <typename MLeftRef,
+          typename MRightRef,
+          typename MLeft  = std::remove_reference_t<MLeftRef>,
+          typename MRight = std::remove_reference_t<MRightRef>>
+auto operator*=(MLeftRef&& A, MRightRef&& B)
+    -> std::enable_if_t<
+        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>>
+{
+    A = (A * B);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -566,9 +577,20 @@ auto cols(MLeft&& mat, int const (&values)[N])
 
 //////////////////////////////////////////////////////////////////////////////
 
-} // end namespace linalg
+template <typename Tp, std::size_t Size>
+auto magnitude(linalg::Vector<Tp, Size> const& v)
+{
+    float sum = 0;
+    float mag;
 
-//////////////////////////////////////////////////////////////////////////////
+    for (int i = 0; i < v.size(); ++i)
+    {
+        sum += (v[i] * v[i]);
+    }
+
+    mag = std::sqrt(sum);
+    return mag;
+}
 
 template <typename T>
 inline constexpr auto primary_dimension()
@@ -626,6 +648,10 @@ auto iter(MLeftRef&& mat)
         return result;
     }
 }
+
+} // end namespace linalg
+
+//////////////////////////////////////////////////////////////////////////////
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -690,21 +716,6 @@ auto T(MatRef&& mat) -> linalg::Matrix<typename Mat::value_type, Mat::cols(), Ma
         }
     }
     return result;
-}
-
-template <typename Tp, std::size_t Size>
-auto magnitude(linalg::Vector<Tp, Size>& v)
-{
-    float sum = 0;
-    float mag;
-
-    for (int i = 0; i < v.size(); ++i)
-    {
-        sum += (v[i] * v[i]);
-    }
-
-    mag = std::sqrt(sum);
-    return mag;
 }
 
 template <typename Tp, std::size_t Size>

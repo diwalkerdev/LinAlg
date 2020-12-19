@@ -1,13 +1,11 @@
-#ifndef LINALG_UTIL_H
-#define LINALG_UTIL_H
+#pragma once
 
 #include "linalg/matrix.hpp"
-
 #include <cmath>
 
 //////////////////////////////////////////////////////////////////////////////
 
-auto lrotzf(float alpha) -> linalg::Matrix<float, 2, 2>
+inline auto lrotzf(float alpha) -> linalg::Matrix<float, 2, 2>
 {
     return {{{cosf(alpha), sinf(alpha)},
              {-sinf(alpha), cosf(alpha)}}};
@@ -15,7 +13,7 @@ auto lrotzf(float alpha) -> linalg::Matrix<float, 2, 2>
 
 //////////////////////////////////////////////////////////////////////////////
 
-auto rrotzf(float alpha) -> linalg::Matrix<float, 2, 2>
+inline auto rrotzf(float alpha) -> linalg::Matrix<float, 2, 2>
 {
 
     return {{{cosf(alpha), -sinf(alpha)},
@@ -24,7 +22,7 @@ auto rrotzf(float alpha) -> linalg::Matrix<float, 2, 2>
 
 //////////////////////////////////////////////////////////////////////////////
 
-auto ltransf(float alpha, float x, float y) -> linalg::Matrix<float, 3, 3>
+inline auto ltransf(float alpha, float x, float y) -> linalg::Matrix<float, 3, 3>
 {
     return {{{cosf(alpha), sinf(alpha), x},
              {-sinf(alpha), cosf(alpha), y},
@@ -33,7 +31,7 @@ auto ltransf(float alpha, float x, float y) -> linalg::Matrix<float, 3, 3>
 
 //////////////////////////////////////////////////////////////////////////////
 
-auto rtransf(float alpha, float x, float y) -> linalg::Matrix<float, 3, 3>
+inline auto rtransf(float alpha, float x, float y) -> linalg::Matrix<float, 3, 3>
 {
     return {{{cosf(alpha), -sinf(alpha), 0},
              {sinf(alpha), cosf(alpha), 0},
@@ -41,5 +39,3 @@ auto rtransf(float alpha, float x, float y) -> linalg::Matrix<float, 3, 3>
 }
 
 //////////////////////////////////////////////////////////////////////////////
-
-#endif // LINALG_UTIL_H
