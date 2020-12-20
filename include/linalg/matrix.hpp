@@ -268,14 +268,43 @@ inline auto _at(MatRef&& mat, size_t pos) -> return_type
 //////////////////////////////////////////////////////////////////////////////
 
 /*
-        Explanation of template madness.
-        
-        Operator* uses perfect forwarding so l and r value references can be passed to the function.
-        This means the type passed in could be a reference (i.e T&). You can't use :: on a reference, hence remove_reference_t.
-        
-        Because operator* is templated, scalars also match, which we don't want (use SFINAE).
-        Remove scalars by enable_if_t. disjunction and is floating point is used to check both parameters are not floats.
-        */
+            Explanation of template madness.
+            
+            Operator* uses perfect forwarding so l and r value references can be passed to the function.
+            This means the type passed in could be a reference (i.e T&). You can't use :: on a reference, hence remove_reference_t.
+            
+            Because operator* is templated, scalars also match, which we don't want (use SFINAE).
+            Remove scalars by enable_if_t. disjunction and is floating point is used to check both parameters are not floats.
+            */
+template <typename MLeftRef,
+          typename MRightRef,
+          typename MLeft       = std::remove_reference_t<MLeftRef>,
+          typename MRight      = std::remove_reference_t<MRightRef>,
+          typename return_type = decltype(
+              typename MLeft::value_type{} * typename MRight::value_type{})
+          /*typename return_type = float*/>
+auto operator*(MLeftRef&& A, MRightRef&& B)
+    -> std::enable_if_t<is_rowvec_v<MLeft> && is_colvec_v<MRight>, return_type>
+{
+    static_assert(MLeft::cols() == MRight::rows(), "Invalid matrix dimensions.");
+
+    return_type result{0};
+
+    size_t i, j, k;
+
+    for (i = 0; i < MLeft::rows(); ++i)
+    {
+        for (j = 0; j < MRight::cols(); ++j)
+        {
+            for (k = 0; k < MLeft::cols(); ++k)
+            {
+                result += _idx(A, i, k) * _idx(B, k, j);
+            }
+        }
+    }
+
+    return result;
+}
 
 template <typename MLeftRef,
           typename MRightRef,
@@ -285,9 +314,8 @@ template <typename MLeftRef,
               typename MLeft::value_type{} * typename MRight::value_type{}),
           typename return_type = Matrix<return_value, MLeft::rows(), MRight::cols()>>
 auto operator*(MLeftRef&& A, MRightRef&& B)
-    -> std::enable_if_t<
-        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>,
-        return_type>
+    -> std::enable_if_t<(is_matrix_v<MLeft> && is_matrix_v<MRight>)&&!(is_rowvec_v<MLeft> && is_colvec_v<MRight>),
+                        return_type>
 {
     static_assert(MLeft::cols() == MRight::rows(), "Invalid matrix dimensions.");
 
@@ -357,8 +385,7 @@ template <typename MLeftRef,
           typename MLeft  = std::remove_reference_t<MLeftRef>,
           typename MRight = std::remove_reference_t<MRightRef>>
 auto operator*=(MLeftRef&& A, MRightRef&& B)
-    -> std::enable_if_t<
-        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>>
+    -> std::enable_if_t<is_matrix_v<MLeft> && is_matrix_v<MRight>>
 {
     A = (A * B);
 }
@@ -375,9 +402,8 @@ template <typename MLeftRef,
               typename MLeft::value_type{} + typename MRight::value_type{}),
           typename return_type = Matrix<return_value, MLeft::rows(), MLeft::cols()>>
 auto operator+(MLeftRef&& A, MRightRef&& B)
-    -> std::enable_if_t<
-        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>,
-        return_type>
+    -> std::enable_if_t<is_matrix_v<MLeft> && is_matrix_v<MRight>,
+                        return_type>
 {
     static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
     static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
@@ -405,9 +431,8 @@ template <typename MLeftRef,
               typename MLeft::value_type{} + typename MRight::value_type{}),
           typename return_type = Matrix<return_value, MLeft::rows(), MLeft::cols()>>
 auto operator-(MLeftRef&& A, MRightRef&& B)
-    -> std::enable_if_t<
-        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>,
-        return_type>
+    -> std::enable_if_t<is_matrix_v<MLeft> && is_matrix_v<MRight>,
+                        return_type>
 {
     static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
     static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
@@ -448,7 +473,7 @@ template <std::floating_point Tp,
           typename MRightRef,
           typename MRight = std::remove_reference_t<MRightRef>>
 auto operator+(Tp B, MRightRef&& A)
-    -> std::enable_if_t<is_matrix<MRight>::value, MRight>
+    -> std::enable_if_t<is_matrix_v<MRight>, MRight>
 {
     return A + B;
 }
@@ -473,9 +498,8 @@ template <typename MLeftRef,
           typename MLeft  = std::remove_reference_t<MLeftRef>,
           typename MRight = std::remove_reference_t<MRightRef>>
 auto operator+=(MLeftRef& A, MRightRef&& B)
-    -> std::enable_if_t<
-        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>,
-        MLeft&>
+    -> std::enable_if_t<is_matrix_v<MLeft> && is_matrix_v<MRight>,
+                        MLeft&>
 {
     static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
     static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
@@ -520,9 +544,8 @@ template <typename MLeftRef,
           typename MLeft  = std::remove_reference_t<MLeftRef>,
           typename MRight = std::remove_reference_t<MRightRef>>
 auto operator==(MLeftRef&& A, MRightRef&& B)
-    -> std::enable_if_t<
-        std::conjunction_v<is_matrix<MLeft>, is_matrix<MRight>>,
-        bool>
+    -> std::enable_if_t<is_matrix_v<MLeft> && is_matrix_v<MRight>,
+                        bool>
 {
     static_assert(MLeft::cols() == MRight::cols(), "Invalid matrix dimensions.");
     static_assert(MLeft::rows() == MRight::rows(), "Invalid matrix dimensions.");
@@ -649,6 +672,17 @@ auto iter(MLeftRef&& mat)
     }
 }
 
+
+template <typename Tp, std::size_t Size>
+auto norm(linalg::Vector<Tp, Size>& v)
+{
+    auto  result = v;
+    float mag    = magnitude(v);
+
+    return (result * (1.f / mag));
+}
+
+
 } // end namespace linalg
 
 //////////////////////////////////////////////////////////////////////////////
@@ -716,15 +750,6 @@ auto T(MatRef&& mat) -> linalg::Matrix<typename Mat::value_type, Mat::cols(), Ma
         }
     }
     return result;
-}
-
-template <typename Tp, std::size_t Size>
-auto norm(linalg::Vector<Tp, Size>& v)
-{
-    auto  result = v;
-    float mag    = magnitude(v);
-
-    return (result * (1.f / mag));
 }
 
 
